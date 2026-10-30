@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Xcode / Swift Package Manager
+.build/
+.swiftpm/
+DerivedData/
+*.xcuserstate
+project.xcworkspace/xcuserdata/
+*.xcuserdatad
+
+# Build artifacts & distribution
+dist/
+
+# Scratch & Temporary
+*.tmp
+*.log

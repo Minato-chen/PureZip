@@ -1,0 +1,1607 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		040D80748E9C78ACF65A13B1 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D991DB6957CD17DE0F7A75DA /* AppKit.framework */; };
+		0C73E34EA4F812B0C56B6874 /* PureZipStatusItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD443AC88F5CA7111ED7B3B6 /* PureZipStatusItemController.swift */; };
+		0CCB5F2BAF61013278A76C5C /* ArchiveAssociationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9861E634188DEC401D71F304 /* ArchiveAssociationStore.swift */; };
+		0FBA4F51BB50D9644F320DF1 /* PureZipFinderSupport.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A951EC2F338A5867BA943ECB /* PureZipFinderSupport.framework */; };
+		10433C5CBD0A260CC9B29E9B /* model-viewer.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 0A4FC5305BD3A462462A8EB6 /* model-viewer.min.js */; };
+		10A6804FD41677FF2B8C6D87 /* PureZipQuickLookMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA2FAA0A87441AFC1D21980 /* PureZipQuickLookMain.swift */; };
+		1245ADD1B7387D49908F4475 /* InspectorMediaPlayers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93B4A5D19D2D18A9522EBB91 /* InspectorMediaPlayers.swift */; };
+		14EC96F45C74BF1AC127B495 /* ArchiveHoverPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E1AE878CF66C8DBC998FD71 /* ArchiveHoverPreview.swift */; };
+		183F2F20653B77AEB0752466 /* ArchiveEngines.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 553BCE2EF923D95948D78318 /* ArchiveEngines.framework */; };
+		21EE2A81199A5D45023F9B72 /* ArchiveEngines.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 553BCE2EF923D95948D78318 /* ArchiveEngines.framework */; };
+		299E179383E88E503337E48C /* ArchiveEntryRenameSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8D107351CB5754394BD89D0 /* ArchiveEntryRenameSheet.swift */; };
+		2B9CEA46AA136E2A54B15D21 /* MainWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C67FD0DEFB51D1852020EE3C /* MainWindowController.swift */; };
+		2C25F126E0ABE6B6FE23237A /* ArchiveEngines.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 553BCE2EF923D95948D78318 /* ArchiveEngines.framework */; };
+		31D0BC3BAD0DD5D5CAF5E11D /* PureZipFinderSupport.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = A951EC2F338A5867BA943ECB /* PureZipFinderSupport.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		3A1C80EFC30665A0B631766E /* DeskViewModes.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCEBC952D94C5F07E09AF9FA /* DeskViewModes.swift */; };
+		4213DAE98C738A371D4A8C93 /* ArchiveCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0071604743ED43BD1E7E9C0B /* ArchiveCore.framework */; };
+		4257EB4648BB2C921EBCF53D /* MediaPreviewExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29753B89ECE1AC8894CC82B7 /* MediaPreviewExtractor.swift */; };
+		434B882EF45CDA35E8E6945E /* WorkerProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 087030CC28D1C5F6C6067650 /* WorkerProtocol.swift */; };
+		46A9DAB5D91D80A20F7A34E6 /* ArchiveCreationPurpose.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C7FB4113DC60AC3851BD8C6 /* ArchiveCreationPurpose.swift */; };
+		46FF589D7B45ADD12653D1B1 /* PureZipFinderSupport.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A951EC2F338A5867BA943ECB /* PureZipFinderSupport.framework */; };
+		4799CB1290C26742C7B8E043 /* EntryIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 803D9E75AE682A9931BD8ECE /* EntryIndex.swift */; };
+		47C734945BFCFD4881B5ED68 /* PureActionsRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2BFB9BAD942B31B16128051 /* PureActionsRouter.swift */; };
+		4AD4BDBAD88D3A2060B52ABE /* PureZipPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9BE1ADBFFA31E347D735787 /* PureZipPreferences.swift */; };
+		4B70BE65BCD1F8A79557BE6E /* ArchiveVolumeFamily.swift in Sources */ = {isa = PBXBuildFile; fileRef = E330FFB73629546DD3559943 /* ArchiveVolumeFamily.swift */; };
+		50B3FFA236FCA442E2AB0B8C /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AEC559752405E9C1238D27A2 /* Quartz.framework */; };
+		52272B249AB7F9A98320D23C /* ArchiveEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E45B5D3B0F7C95B05793B3 /* ArchiveEngine.swift */; };
+		5CF8A586224CFAE9850F6095 /* ArchiveEngineBroker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FDAD452A2106403D5D567B3 /* ArchiveEngineBroker.swift */; };
+		6335B703975ECA8DBB78A0E1 /* ArchiveDragExportManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1688A1194AEB956798B15194 /* ArchiveDragExportManager.swift */; };
+		6CBA016E8D25F579E558A4AA /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79EDC9F38F229EB93C47774 /* SettingsWindowController.swift */; };
+		6D9052BE49E07D77C96C99EC /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33AA555E817B0B5BAFC247E0 /* SettingsView.swift */; };
+		6DE1CF01A9577761DB519EB6 /* ArchiveCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0071604743ED43BD1E7E9C0B /* ArchiveCore.framework */; };
+		71737B1A88ECA4D8953FCF6A /* OtherEngines.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7233CAF84386CC1E3043A5B2 /* OtherEngines.swift */; };
+		7178F66A4CAEC21A97CDC621 /* ManagedTemporaryArtifactRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07B24A738203F0FED6836F44 /* ManagedTemporaryArtifactRegistry.swift */; };
+		729F6E01C5BF6C800B809F78 /* WindowsCompatibilityFixSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA38C8F70C5CA11273AD21C0 /* WindowsCompatibilityFixSheetView.swift */; };
+		7373D1FDAFBB89F733B92672 /* PureZipFinderSyncMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E10B4172708E924A8A16940 /* PureZipFinderSyncMain.swift */; };
+		758851F05861AB86DB25F4E2 /* ArchiveCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0071604743ED43BD1E7E9C0B /* ArchiveCore.framework */; };
+		7920A27B2FFAB7A7D41B1285 /* QuickLookPreviewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94EA6F8AFCAAC9936C021429 /* QuickLookPreviewController.swift */; };
+		7F4BC93039368804D92A67F1 /* ArchiveCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0071604743ED43BD1E7E9C0B /* ArchiveCore.framework */; };
+		802E9AD4B8AEE4DFBD81EEFC /* ArchiveCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0071604743ED43BD1E7E9C0B /* ArchiveCore.framework */; };
+		8263EDEEE6A027C03035E41F /* PureZipAppViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA3E9EE97FE2F434C84C8848 /* PureZipAppViews.swift */; };
+		847D08ED0685A207D79D59C8 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 5132E511D4044D26D54E4B4A /* AppIcon.icns */; };
+		847D08ED0685A207D79D59C9 /* 7zz in Resources */ = {isa = PBXBuildFile; fileRef = 56B7806B4EF8947409C6B65D /* 7zz */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		85BB9390385B29AF53F807F4 /* PureZipUpdateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98C3173DBB065C6BC09DEA49 /* PureZipUpdateManager.swift */; };
+		866AE8E7A3E285065F728766 /* ArchivePreviewSeedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5548090618BB880718884386 /* ArchivePreviewSeedStore.swift */; };
+		87A266E3C9CBE9832B0B9ED5 /* BSDTarEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5400C4630678869B3A64D186 /* BSDTarEngine.swift */; };
+		8BE03B4B0FDEF36DC22D0254 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = DDCF3248069372BB841B04FD /* libz.tbd */; };
+		8C4EFDAE15058D8E82D0D781 /* FinderSync.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EE41FEA658ADAB18CF8D6A8B /* FinderSync.framework */; };
+		92FE0E959C2C917F4CDA3E4C /* ArchiveEngines.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 553BCE2EF923D95948D78318 /* ArchiveEngines.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		95B0C5DDAF57E6EBC0DFB9CA /* PureZipQuickLook.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E25BD7F1ED84A3C232D788DA /* PureZipQuickLook.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		9CC7C589CBF2A9684AD988B5 /* purezip-cli in Resources */ = {isa = PBXBuildFile; fileRef = A64CC8EF67F68664AA72F015 /* purezip-cli */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A611FC7D8E02B80B690E7FFF /* PureZipArchiveService.xpc in CopyFiles */ = {isa = PBXBuildFile; fileRef = 560C5C95DCC1D7F78564FA93 /* PureZipArchiveService.xpc */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		A7DF699E2278F828EDAA3293 /* PureZipArchiveServiceMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E77F72B3CCD485964310CEA /* PureZipArchiveServiceMain.swift */; };
+		AD52422F0FD18151B02E307F /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D991DB6957CD17DE0F7A75DA /* AppKit.framework */; };
+		B605AAC9AAF6394D623CDFFB /* ArchiveCreationDialogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 253AB72BD8F9D4A8FBAF2219 /* ArchiveCreationDialogView.swift */; };
+		B659C7120C4028D6B66639AE /* ArchiveCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0071604743ED43BD1E7E9C0B /* ArchiveCore.framework */; };
+		B69B298DA4B3921E6CB49FB3 /* SmartCompressionClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A02641765BB0673950A0490 /* SmartCompressionClassifier.swift */; };
+		C09F710FE0CFE574AE931E9F /* PureZipCLIMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71CC1BD7D94B401632A1168F /* PureZipCLIMain.swift */; };
+		C2DA9862283A6D65D93488C5 /* ArchiveModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D525DD727B7D5C18B735B33B /* ArchiveModels.swift */; };
+		C79CA76F1B1B782751C3E9F8 /* ArchivePasswordPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 816303A0C79E23C0B913541A /* ArchivePasswordPromptView.swift */; };
+		D51D7B22759AD1F23E78810C /* ArchiveEngines.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 553BCE2EF923D95948D78318 /* ArchiveEngines.framework */; };
+		D6B65078745F1D9DAECCC943 /* ArchiveBrowsingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20F739603314BF789D4C33DE /* ArchiveBrowsingSession.swift */; };
+		DAC21431B60C21B76060F577 /* PureZipAppMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74DE0E61E0CA198AF10EAEC7 /* PureZipAppMain.swift */; };
+		DBA01BA1D85C81A33E04F91B /* BatchExtractionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2947BA5309961B4F11417AAF /* BatchExtractionManager.swift */; };
+		DC7EF9541E04D30897432A1C /* PureZipLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EDEB2540A4ED363B85864B2 /* PureZipLocalization.swift */; };
+		DEC74C4DD5CF83BAA0A0FF2C /* PureZipFinderSupport.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A951EC2F338A5867BA943ECB /* PureZipFinderSupport.framework */; };
+		DF90398B9448247D509BBD43 /* ArchiveCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0071604743ED43BD1E7E9C0B /* ArchiveCore.framework */; };
+		E2BDCDDAB66F3ACB0A7C9B75 /* PureZipIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 964B55765067BBA3F4E24D5D /* PureZipIcons.swift */; };
+		E547BC2D60C4AB3AB96DFC35 /* 7z-License.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2B98623F16E74D8800A77B25 /* 7z-License.txt */; };
+		EAC240D341D51A79912DFDD8 /* SevenZipEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8991FE2CA9C652FC85872BF3 /* SevenZipEngine.swift */; };
+		EAFCF5F83C7176DB09EDD9DA /* LegacyCJKFilenameDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 771477339B4F2A92F9A9682E /* LegacyCJKFilenameDecoder.swift */; };
+		EB977343A4074B7976066E10 /* ArchiveCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 0071604743ED43BD1E7E9C0B /* ArchiveCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		EBD9A28FC2484EDED451B2D0 /* SelfTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E439A59B624C4B2A5141DB5 /* SelfTest.swift */; };
+		ED47D2D75BF5566868C9B961 /* QuickLookUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1A6023D0B68AE3E0D182434A /* QuickLookUI.framework */; };
+		F21299419CBB2C925E984D4C /* ZIPEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F783248DD23708CB65D9F709 /* ZIPEngine.swift */; };
+		F24DCE15528FE20FA2FE5C7F /* PureZipFinderSync.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E1B1E74FD844615F5A137111 /* PureZipFinderSync.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F5307BADA0D5275598580642 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 3BBD1B2CAAEF40B7CA54F445 /* libsqlite3.tbd */; };
+		FBC8F2914783B32D37D7AB0F /* PureZipFinderSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BA0B2C004F6C328A562A8A8 /* PureZipFinderSupport.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		37BAFCEE1B3138B876972999 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6B425E7D39ABE9A5F46A2338;
+			remoteInfo = ArchiveCore;
+		};
+		383C0416C9A3E42042999034 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2D03CCE9197BA8CE541E2B8B;
+			remoteInfo = ArchiveEngines;
+		};
+		3ABBFD667C336481AAC56992 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6B425E7D39ABE9A5F46A2338;
+			remoteInfo = ArchiveCore;
+		};
+		50AEAB97F6735FE70D1CCEB2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6B425E7D39ABE9A5F46A2338;
+			remoteInfo = ArchiveCore;
+		};
+		53572AD7B833175F5222B504 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6B425E7D39ABE9A5F46A2338;
+			remoteInfo = ArchiveCore;
+		};
+		5A81E858DECC3D3092021C00 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2D03CCE9197BA8CE541E2B8B;
+			remoteInfo = ArchiveEngines;
+		};
+		5DDCB3765BF232BADA35E4BA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2D03CCE9197BA8CE541E2B8B;
+			remoteInfo = ArchiveEngines;
+		};
+		650C352E08D1CFCF0B76072C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EDB189B17E6AB24EEFB09314;
+			remoteInfo = PureZipFinderSupport;
+		};
+		8424904F9425F1C0E779C7CC /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B310E43EEBEB0905E82C0A74;
+			remoteInfo = PureZipArchiveService;
+		};
+		8CA773A55C3269491B269BB2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6B425E7D39ABE9A5F46A2338;
+			remoteInfo = ArchiveCore;
+		};
+		8ECBD09028BE4CEAE9069419 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2D03CCE9197BA8CE541E2B8B;
+			remoteInfo = ArchiveEngines;
+		};
+		9D5BF22A3E8D58B322E886B1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 514497BC33CE2DEAC14BD509;
+			remoteInfo = PureZipFinderSync;
+		};
+		A5E7AFFB4237F314E54364EA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4DB68CE147B94C03E5855A8F;
+			remoteInfo = "purezip-cli";
+		};
+		A94965EE35084CD8DFC727A7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C2880D8F3926FAF2A34344E7;
+			remoteInfo = PureZipQuickLook;
+		};
+		AC20002584076C1636EA37E4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6B425E7D39ABE9A5F46A2338;
+			remoteInfo = ArchiveCore;
+		};
+		AD7DF4AF1E324EAB1C79732A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6B425E7D39ABE9A5F46A2338;
+			remoteInfo = ArchiveCore;
+		};
+		B270CB9EB541D90C71B9D135 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EDB189B17E6AB24EEFB09314;
+			remoteInfo = PureZipFinderSupport;
+		};
+		B85B613EF265EBAECD0CF989 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9102298EC1DCF68A403A47FF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EDB189B17E6AB24EEFB09314;
+			remoteInfo = PureZipFinderSupport;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		4B7EEBB77D230E1FBCE1B886 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				F24DCE15528FE20FA2FE5C7F /* PureZipFinderSync.appex in Embed Foundation Extensions */,
+				95B0C5DDAF57E6EBC0DFB9CA /* PureZipQuickLook.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7FE23F38F4E4C168295E7EAA /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				EB977343A4074B7976066E10 /* ArchiveCore.framework in Embed Frameworks */,
+				92FE0E959C2C917F4CDA3E4C /* ArchiveEngines.framework in Embed Frameworks */,
+				31D0BC3BAD0DD5D5CAF5E11D /* PureZipFinderSupport.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C96E1D59265B84A1405FA315 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/XPCServices";
+			dstSubfolderSpec = 16;
+			files = (
+				A611FC7D8E02B80B690E7FFF /* PureZipArchiveService.xpc in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		0071604743ED43BD1E7E9C0B /* ArchiveCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = ArchiveCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		07B24A738203F0FED6836F44 /* ManagedTemporaryArtifactRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedTemporaryArtifactRegistry.swift; sourceTree = "<group>"; };
+		087030CC28D1C5F6C6067650 /* WorkerProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkerProtocol.swift; sourceTree = "<group>"; };
+		0A4FC5305BD3A462462A8EB6 /* model-viewer.min.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "model-viewer.min.js"; sourceTree = "<group>"; };
+		0E10B4172708E924A8A16940 /* PureZipFinderSyncMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureZipFinderSyncMain.swift; sourceTree = "<group>"; };
+		0E439A59B624C4B2A5141DB5 /* SelfTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfTest.swift; sourceTree = "<group>"; };
+		1688A1194AEB956798B15194 /* ArchiveDragExportManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveDragExportManager.swift; sourceTree = "<group>"; };
+		1A6023D0B68AE3E0D182434A /* QuickLookUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = QuickLookUI.framework; sourceTree = "<group>"; };
+		1FDAD452A2106403D5D567B3 /* ArchiveEngineBroker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveEngineBroker.swift; sourceTree = "<group>"; };
+		20F739603314BF789D4C33DE /* ArchiveBrowsingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveBrowsingSession.swift; sourceTree = "<group>"; };
+		253AB72BD8F9D4A8FBAF2219 /* ArchiveCreationDialogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveCreationDialogView.swift; sourceTree = "<group>"; };
+		2947BA5309961B4F11417AAF /* BatchExtractionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchExtractionManager.swift; sourceTree = "<group>"; };
+		29753B89ECE1AC8894CC82B7 /* MediaPreviewExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaPreviewExtractor.swift; sourceTree = "<group>"; };
+		2A02641765BB0673950A0490 /* SmartCompressionClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartCompressionClassifier.swift; sourceTree = "<group>"; };
+		2B98623F16E74D8800A77B25 /* 7z-License.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "7z-License.txt"; sourceTree = "<group>"; };
+		2BA0B2C004F6C328A562A8A8 /* PureZipFinderSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureZipFinderSupport.swift; sourceTree = "<group>"; };
+		33AA555E817B0B5BAFC247E0 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		3BBD1B2CAAEF40B7CA54F445 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
+		4E1AE878CF66C8DBC998FD71 /* ArchiveHoverPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveHoverPreview.swift; sourceTree = "<group>"; };
+		5132E511D4044D26D54E4B4A /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
+		5400C4630678869B3A64D186 /* BSDTarEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BSDTarEngine.swift; sourceTree = "<group>"; };
+		553BCE2EF923D95948D78318 /* ArchiveEngines.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = ArchiveEngines.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		5548090618BB880718884386 /* ArchivePreviewSeedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchivePreviewSeedStore.swift; sourceTree = "<group>"; };
+		560C5C95DCC1D7F78564FA93 /* PureZipArchiveService.xpc */ = {isa = PBXFileReference; explicitFileType = "wrapper.xpc-service"; includeInIndex = 0; path = PureZipArchiveService.xpc; sourceTree = BUILT_PRODUCTS_DIR; };
+		56B7806B4EF8947409C6B65D /* 7zz */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = 7zz; sourceTree = "<group>"; };
+		5DA2FAA0A87441AFC1D21980 /* PureZipQuickLookMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureZipQuickLookMain.swift; sourceTree = "<group>"; };
+		5EDEB2540A4ED363B85864B2 /* PureZipLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureZipLocalization.swift; sourceTree = "<group>"; };
+		6E77F72B3CCD485964310CEA /* PureZipArchiveServiceMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureZipArchiveServiceMain.swift; sourceTree = "<group>"; };
+		71CC1BD7D94B401632A1168F /* PureZipCLIMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureZipCLIMain.swift; sourceTree = "<group>"; };
+		7233CAF84386CC1E3043A5B2 /* OtherEngines.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OtherEngines.swift; sourceTree = "<group>"; };
+		74DE0E61E0CA198AF10EAEC7 /* PureZipAppMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureZipAppMain.swift; sourceTree = "<group>"; };
+		771477339B4F2A92F9A9682E /* LegacyCJKFilenameDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyCJKFilenameDecoder.swift; sourceTree = "<group>"; };
+		77E45B5D3B0F7C95B05793B3 /* ArchiveEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveEngine.swift; sourceTree = "<group>"; };
+		7C7FB4113DC60AC3851BD8C6 /* ArchiveCreationPurpose.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveCreationPurpose.swift; sourceTree = "<group>"; };
+		803D9E75AE682A9931BD8ECE /* EntryIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryIndex.swift; sourceTree = "<group>"; };
+		816303A0C79E23C0B913541A /* ArchivePasswordPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchivePasswordPromptView.swift; sourceTree = "<group>"; };
+		8991FE2CA9C652FC85872BF3 /* SevenZipEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SevenZipEngine.swift; sourceTree = "<group>"; };
+		93B4A5D19D2D18A9522EBB91 /* InspectorMediaPlayers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorMediaPlayers.swift; sourceTree = "<group>"; };
+		94EA6F8AFCAAC9936C021429 /* QuickLookPreviewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickLookPreviewController.swift; sourceTree = "<group>"; };
+		964B55765067BBA3F4E24D5D /* PureZipIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureZipIcons.swift; sourceTree = "<group>"; };
+		9861E634188DEC401D71F304 /* ArchiveAssociationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveAssociationStore.swift; sourceTree = "<group>"; };
+		98C3173DBB065C6BC09DEA49 /* PureZipUpdateManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureZipUpdateManager.swift; sourceTree = "<group>"; };
+		A64CC8EF67F68664AA72F015 /* purezip-cli */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "purezip-cli"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A951EC2F338A5867BA943ECB /* PureZipFinderSupport.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = PureZipFinderSupport.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		AEC559752405E9C1238D27A2 /* Quartz.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = Quartz.framework; sourceTree = "<group>"; };
+		BA3E9EE97FE2F434C84C8848 /* PureZipAppViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureZipAppViews.swift; sourceTree = "<group>"; };
+		C24C2FF20E7A28B7A72774CE /* PureZip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PureZip.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C67FD0DEFB51D1852020EE3C /* MainWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowController.swift; sourceTree = "<group>"; };
+		CCEBC952D94C5F07E09AF9FA /* DeskViewModes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskViewModes.swift; sourceTree = "<group>"; };
+		CD443AC88F5CA7111ED7B3B6 /* PureZipStatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureZipStatusItemController.swift; sourceTree = "<group>"; };
+		D2BFB9BAD942B31B16128051 /* PureActionsRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureActionsRouter.swift; sourceTree = "<group>"; };
+		D525DD727B7D5C18B735B33B /* ArchiveModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveModels.swift; sourceTree = "<group>"; };
+		D79EDC9F38F229EB93C47774 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
+		D991DB6957CD17DE0F7A75DA /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = AppKit.framework; sourceTree = "<group>"; };
+		D9BE1ADBFFA31E347D735787 /* PureZipPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureZipPreferences.swift; sourceTree = "<group>"; };
+		DDCF3248069372BB841B04FD /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
+		E1B1E74FD844615F5A137111 /* PureZipFinderSync.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PureZipFinderSync.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E25BD7F1ED84A3C232D788DA /* PureZipQuickLook.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PureZipQuickLook.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E330FFB73629546DD3559943 /* ArchiveVolumeFamily.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveVolumeFamily.swift; sourceTree = "<group>"; };
+		EE41FEA658ADAB18CF8D6A8B /* FinderSync.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = FinderSync.framework; sourceTree = "<group>"; };
+		F783248DD23708CB65D9F709 /* ZIPEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZIPEngine.swift; sourceTree = "<group>"; };
+		F8D107351CB5754394BD89D0 /* ArchiveEntryRenameSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveEntryRenameSheet.swift; sourceTree = "<group>"; };
+		FA38C8F70C5CA11273AD21C0 /* WindowsCompatibilityFixSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsCompatibilityFixSheetView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1D3BC0C0D08A72A8DBAB5F59 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6DE1CF01A9577761DB519EB6 /* ArchiveCore.framework in Frameworks */,
+				21EE2A81199A5D45023F9B72 /* ArchiveEngines.framework in Frameworks */,
+				DEC74C4DD5CF83BAA0A0FF2C /* PureZipFinderSupport.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		27EDC4210DCAA10F7796EBF3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F5307BADA0D5275598580642 /* libsqlite3.tbd in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		595CEBEFB0B846EF5E7575DE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DF90398B9448247D509BBD43 /* ArchiveCore.framework in Frameworks */,
+				183F2F20653B77AEB0752466 /* ArchiveEngines.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6B0AD4CE6449C1D11A597230 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				802E9AD4B8AEE4DFBD81EEFC /* ArchiveCore.framework in Frameworks */,
+				8BE03B4B0FDEF36DC22D0254 /* libz.tbd in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8F4033116D43D4C583F86A76 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7F4BC93039368804D92A67F1 /* ArchiveCore.framework in Frameworks */,
+				0FBA4F51BB50D9644F320DF1 /* PureZipFinderSupport.framework in Frameworks */,
+				8C4EFDAE15058D8E82D0D781 /* FinderSync.framework in Frameworks */,
+				040D80748E9C78ACF65A13B1 /* AppKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B0279C4BD832C7F46E7FD85F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4213DAE98C738A371D4A8C93 /* ArchiveCore.framework in Frameworks */,
+				D51D7B22759AD1F23E78810C /* ArchiveEngines.framework in Frameworks */,
+				50B3FFA236FCA442E2AB0B8C /* Quartz.framework in Frameworks */,
+				ED47D2D75BF5566868C9B961 /* QuickLookUI.framework in Frameworks */,
+				AD52422F0FD18151B02E307F /* AppKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BFE357E659E60007481A1723 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B659C7120C4028D6B66639AE /* ArchiveCore.framework in Frameworks */,
+				2C25F126E0ABE6B6FE23237A /* ArchiveEngines.framework in Frameworks */,
+				46FF589D7B45ADD12653D1B1 /* PureZipFinderSupport.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EB55A6008A9FE4902EDC16F8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				758851F05861AB86DB25F4E2 /* ArchiveCore.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0300C07D942C6E842BE28411 /* PureZipApp */ = {
+			isa = PBXGroup;
+			children = (
+				9861E634188DEC401D71F304 /* ArchiveAssociationStore.swift */,
+				20F739603314BF789D4C33DE /* ArchiveBrowsingSession.swift */,
+				253AB72BD8F9D4A8FBAF2219 /* ArchiveCreationDialogView.swift */,
+				1688A1194AEB956798B15194 /* ArchiveDragExportManager.swift */,
+				F8D107351CB5754394BD89D0 /* ArchiveEntryRenameSheet.swift */,
+				4E1AE878CF66C8DBC998FD71 /* ArchiveHoverPreview.swift */,
+				816303A0C79E23C0B913541A /* ArchivePasswordPromptView.swift */,
+				2947BA5309961B4F11417AAF /* BatchExtractionManager.swift */,
+				CCEBC952D94C5F07E09AF9FA /* DeskViewModes.swift */,
+				93B4A5D19D2D18A9522EBB91 /* InspectorMediaPlayers.swift */,
+				C67FD0DEFB51D1852020EE3C /* MainWindowController.swift */,
+				29753B89ECE1AC8894CC82B7 /* MediaPreviewExtractor.swift */,
+				D2BFB9BAD942B31B16128051 /* PureActionsRouter.swift */,
+				74DE0E61E0CA198AF10EAEC7 /* PureZipAppMain.swift */,
+				BA3E9EE97FE2F434C84C8848 /* PureZipAppViews.swift */,
+				964B55765067BBA3F4E24D5D /* PureZipIcons.swift */,
+				5EDEB2540A4ED363B85864B2 /* PureZipLocalization.swift */,
+				CD443AC88F5CA7111ED7B3B6 /* PureZipStatusItemController.swift */,
+				98C3173DBB065C6BC09DEA49 /* PureZipUpdateManager.swift */,
+				94EA6F8AFCAAC9936C021429 /* QuickLookPreviewController.swift */,
+				33AA555E817B0B5BAFC247E0 /* SettingsView.swift */,
+				D79EDC9F38F229EB93C47774 /* SettingsWindowController.swift */,
+				FA38C8F70C5CA11273AD21C0 /* WindowsCompatibilityFixSheetView.swift */,
+			);
+			path = PureZipApp;
+			sourceTree = "<group>";
+		};
+		0816F9B0B4B3C4A58C3D7618 /* ArchiveCore */ = {
+			isa = PBXGroup;
+			children = (
+				7C7FB4113DC60AC3851BD8C6 /* ArchiveCreationPurpose.swift */,
+				D525DD727B7D5C18B735B33B /* ArchiveModels.swift */,
+				5548090618BB880718884386 /* ArchivePreviewSeedStore.swift */,
+				E330FFB73629546DD3559943 /* ArchiveVolumeFamily.swift */,
+				803D9E75AE682A9931BD8ECE /* EntryIndex.swift */,
+				771477339B4F2A92F9A9682E /* LegacyCJKFilenameDecoder.swift */,
+				07B24A738203F0FED6836F44 /* ManagedTemporaryArtifactRegistry.swift */,
+				D9BE1ADBFFA31E347D735787 /* PureZipPreferences.swift */,
+				087030CC28D1C5F6C6067650 /* WorkerProtocol.swift */,
+			);
+			path = ArchiveCore;
+			sourceTree = "<group>";
+		};
+		2AD1B61EAC8966962965C11F /* PureZipFinderSupport */ = {
+			isa = PBXGroup;
+			children = (
+				2BA0B2C004F6C328A562A8A8 /* PureZipFinderSupport.swift */,
+			);
+			path = PureZipFinderSupport;
+			sourceTree = "<group>";
+		};
+		2EBF464C7AE6ABAEA6F6905B /* PureZipArchiveService */ = {
+			isa = PBXGroup;
+			children = (
+				6E77F72B3CCD485964310CEA /* PureZipArchiveServiceMain.swift */,
+			);
+			path = PureZipArchiveService;
+			sourceTree = "<group>";
+		};
+		30148F460949820DEFABB9C9 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				2B98623F16E74D8800A77B25 /* 7z-License.txt */,
+				56B7806B4EF8947409C6B65D /* 7zz */,
+				5132E511D4044D26D54E4B4A /* AppIcon.icns */,
+				0A4FC5305BD3A462462A8EB6 /* model-viewer.min.js */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		395242EA68A554A294B98AE5 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				0071604743ED43BD1E7E9C0B /* ArchiveCore.framework */,
+				553BCE2EF923D95948D78318 /* ArchiveEngines.framework */,
+				A64CC8EF67F68664AA72F015 /* purezip-cli */,
+				C24C2FF20E7A28B7A72774CE /* PureZip.app */,
+				560C5C95DCC1D7F78564FA93 /* PureZipArchiveService.xpc */,
+				A951EC2F338A5867BA943ECB /* PureZipFinderSupport.framework */,
+				E1B1E74FD844615F5A137111 /* PureZipFinderSync.appex */,
+				E25BD7F1ED84A3C232D788DA /* PureZipQuickLook.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		54473A82BC38D8AC8FEA2713 /* PureZipCLI */ = {
+			isa = PBXGroup;
+			children = (
+				71CC1BD7D94B401632A1168F /* PureZipCLIMain.swift */,
+				0E439A59B624C4B2A5141DB5 /* SelfTest.swift */,
+			);
+			path = PureZipCLI;
+			sourceTree = "<group>";
+		};
+		9EA165EA59C1FEFC6852183B /* PureZipFinderSync */ = {
+			isa = PBXGroup;
+			children = (
+				0E10B4172708E924A8A16940 /* PureZipFinderSyncMain.swift */,
+			);
+			path = PureZipFinderSync;
+			sourceTree = "<group>";
+		};
+		AA2C099884C542E87A19EC82 = {
+			isa = PBXGroup;
+			children = (
+				30148F460949820DEFABB9C9 /* Resources */,
+				C7354FA09867E3AA79797EBE /* Sources */,
+				F47EACA7C434A5928158811E /* Frameworks */,
+				395242EA68A554A294B98AE5 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C7354FA09867E3AA79797EBE /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				0816F9B0B4B3C4A58C3D7618 /* ArchiveCore */,
+				FB980BC610E438B3054E29FC /* ArchiveEngines */,
+				0300C07D942C6E842BE28411 /* PureZipApp */,
+				2EBF464C7AE6ABAEA6F6905B /* PureZipArchiveService */,
+				54473A82BC38D8AC8FEA2713 /* PureZipCLI */,
+				2AD1B61EAC8966962965C11F /* PureZipFinderSupport */,
+				9EA165EA59C1FEFC6852183B /* PureZipFinderSync */,
+				EA433DF19DDAAC056D4083C2 /* PureZipQuickLook */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		EA433DF19DDAAC056D4083C2 /* PureZipQuickLook */ = {
+			isa = PBXGroup;
+			children = (
+				5DA2FAA0A87441AFC1D21980 /* PureZipQuickLookMain.swift */,
+			);
+			path = PureZipQuickLook;
+			sourceTree = "<group>";
+		};
+		F47EACA7C434A5928158811E /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D991DB6957CD17DE0F7A75DA /* AppKit.framework */,
+				EE41FEA658ADAB18CF8D6A8B /* FinderSync.framework */,
+				3BBD1B2CAAEF40B7CA54F445 /* libsqlite3.tbd */,
+				DDCF3248069372BB841B04FD /* libz.tbd */,
+				AEC559752405E9C1238D27A2 /* Quartz.framework */,
+				1A6023D0B68AE3E0D182434A /* QuickLookUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		FB980BC610E438B3054E29FC /* ArchiveEngines */ = {
+			isa = PBXGroup;
+			children = (
+				77E45B5D3B0F7C95B05793B3 /* ArchiveEngine.swift */,
+				1FDAD452A2106403D5D567B3 /* ArchiveEngineBroker.swift */,
+				5400C4630678869B3A64D186 /* BSDTarEngine.swift */,
+				7233CAF84386CC1E3043A5B2 /* OtherEngines.swift */,
+				8991FE2CA9C652FC85872BF3 /* SevenZipEngine.swift */,
+				2A02641765BB0673950A0490 /* SmartCompressionClassifier.swift */,
+				F783248DD23708CB65D9F709 /* ZIPEngine.swift */,
+			);
+			path = ArchiveEngines;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1291BA1AB74B8914F4378522 /* PureZip */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C80459C5EAF5158966C33229 /* Build configuration list for PBXNativeTarget "PureZip" */;
+			buildPhases = (
+				1AA1740E7DEE7EC04124F667 /* Sources */,
+				41DDD33795863C4AD56B2D17 /* Resources */,
+				C96E1D59265B84A1405FA315 /* CopyFiles */,
+				BFE357E659E60007481A1723 /* Frameworks */,
+				4B7EEBB77D230E1FBCE1B886 /* Embed Foundation Extensions */,
+				7FE23F38F4E4C168295E7EAA /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DEE65F56EC701FAD0E069E98 /* PBXTargetDependency */,
+				6970300D1F2BE1BCB832750D /* PBXTargetDependency */,
+				2FD768F5EBF7BA67793548E6 /* PBXTargetDependency */,
+				7EF9D0FB180F4B7C2D5093B4 /* PBXTargetDependency */,
+				5D5C627A909A67905373A37B /* PBXTargetDependency */,
+				B73DAFB0F5830EAFD24365A4 /* PBXTargetDependency */,
+				13889578A47C6BFD2A43F0C4 /* PBXTargetDependency */,
+			);
+			name = PureZip;
+			packageProductDependencies = (
+			);
+			productName = PureZip;
+			productReference = C24C2FF20E7A28B7A72774CE /* PureZip.app */;
+			productType = "com.apple.product-type.application";
+		};
+		2D03CCE9197BA8CE541E2B8B /* ArchiveEngines */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1A456A04FEE54FD6607C4234 /* Build configuration list for PBXNativeTarget "ArchiveEngines" */;
+			buildPhases = (
+				CD0CF6CD2EF7CF3AE44A5B9E /* Sources */,
+				6B0AD4CE6449C1D11A597230 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5CF7F1A4EC3FAF1FDBE71727 /* PBXTargetDependency */,
+			);
+			name = ArchiveEngines;
+			packageProductDependencies = (
+			);
+			productName = ArchiveEngines;
+			productReference = 553BCE2EF923D95948D78318 /* ArchiveEngines.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		4DB68CE147B94C03E5855A8F /* purezip-cli */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7897738093D5D2FF1F1A27ED /* Build configuration list for PBXNativeTarget "purezip-cli" */;
+			buildPhases = (
+				4FB43F989560168DEEA274F1 /* Sources */,
+				1D3BC0C0D08A72A8DBAB5F59 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7189A7281507E9C8BCFD4111 /* PBXTargetDependency */,
+				33693EEE716E17DDAE01A9A7 /* PBXTargetDependency */,
+				EA40C712629894430412291D /* PBXTargetDependency */,
+			);
+			name = "purezip-cli";
+			packageProductDependencies = (
+			);
+			productName = "purezip-cli";
+			productReference = A64CC8EF67F68664AA72F015 /* purezip-cli */;
+			productType = "com.apple.product-type.tool";
+		};
+		514497BC33CE2DEAC14BD509 /* PureZipFinderSync */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5CE83FA29BBD0AF0BD98C1BA /* Build configuration list for PBXNativeTarget "PureZipFinderSync" */;
+			buildPhases = (
+				4FEA0EBF63DD9D324EF79ACE /* Sources */,
+				8F4033116D43D4C583F86A76 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5EDBE930F919AB7C8B5CC0D6 /* PBXTargetDependency */,
+				9FE40DA35614AE017A25D930 /* PBXTargetDependency */,
+			);
+			name = PureZipFinderSync;
+			packageProductDependencies = (
+			);
+			productName = PureZipFinderSync;
+			productReference = E1B1E74FD844615F5A137111 /* PureZipFinderSync.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		6B425E7D39ABE9A5F46A2338 /* ArchiveCore */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7DF8CEF9319AFF04A459E7DC /* Build configuration list for PBXNativeTarget "ArchiveCore" */;
+			buildPhases = (
+				0B32D042568747E0FD8F02E2 /* Sources */,
+				27EDC4210DCAA10F7796EBF3 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ArchiveCore;
+			packageProductDependencies = (
+			);
+			productName = ArchiveCore;
+			productReference = 0071604743ED43BD1E7E9C0B /* ArchiveCore.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		B310E43EEBEB0905E82C0A74 /* PureZipArchiveService */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E7A1DCB2A7A32CE636DBDC1B /* Build configuration list for PBXNativeTarget "PureZipArchiveService" */;
+			buildPhases = (
+				17FE48339C20B41344ED05A2 /* Sources */,
+				595CEBEFB0B846EF5E7575DE /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7A7DD003C92337A440B29DA5 /* PBXTargetDependency */,
+				20FDC0988E9E9B2206A7537C /* PBXTargetDependency */,
+			);
+			name = PureZipArchiveService;
+			packageProductDependencies = (
+			);
+			productName = PureZipArchiveService;
+			productReference = 560C5C95DCC1D7F78564FA93 /* PureZipArchiveService.xpc */;
+			productType = "com.apple.product-type.xpc-service";
+		};
+		C2880D8F3926FAF2A34344E7 /* PureZipQuickLook */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 23EDB197535821E7E79FE204 /* Build configuration list for PBXNativeTarget "PureZipQuickLook" */;
+			buildPhases = (
+				E7B3966BF844EE66B3D17972 /* Sources */,
+				B0279C4BD832C7F46E7FD85F /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0FFE2848D86BE2BB7B1D07BC /* PBXTargetDependency */,
+				DF6787C43796825CADCAA5E0 /* PBXTargetDependency */,
+			);
+			name = PureZipQuickLook;
+			packageProductDependencies = (
+			);
+			productName = PureZipQuickLook;
+			productReference = E25BD7F1ED84A3C232D788DA /* PureZipQuickLook.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		EDB189B17E6AB24EEFB09314 /* PureZipFinderSupport */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C64F83788160E21291646A79 /* Build configuration list for PBXNativeTarget "PureZipFinderSupport" */;
+			buildPhases = (
+				07A286F59EB068374B413A70 /* Sources */,
+				EB55A6008A9FE4902EDC16F8 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5924892D77FDB9E62C0E057F /* PBXTargetDependency */,
+			);
+			name = PureZipFinderSupport;
+			packageProductDependencies = (
+			);
+			productName = PureZipFinderSupport;
+			productReference = A951EC2F338A5867BA943ECB /* PureZipFinderSupport.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		9102298EC1DCF68A403A47FF /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2710;
+				TargetAttributes = {
+					1291BA1AB74B8914F4378522 = {
+						ProvisioningStyle = Automatic;
+					};
+					2D03CCE9197BA8CE541E2B8B = {
+						ProvisioningStyle = Automatic;
+					};
+					4DB68CE147B94C03E5855A8F = {
+						ProvisioningStyle = Automatic;
+					};
+					514497BC33CE2DEAC14BD509 = {
+						ProvisioningStyle = Automatic;
+					};
+					6B425E7D39ABE9A5F46A2338 = {
+						ProvisioningStyle = Automatic;
+					};
+					B310E43EEBEB0905E82C0A74 = {
+						ProvisioningStyle = Automatic;
+					};
+					C2880D8F3926FAF2A34344E7 = {
+						ProvisioningStyle = Automatic;
+					};
+					EDB189B17E6AB24EEFB09314 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = A1180C303D9C16F8725AF0AA /* Build configuration list for PBXProject "PureZip" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = AA2C099884C542E87A19EC82;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 395242EA68A554A294B98AE5 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				6B425E7D39ABE9A5F46A2338 /* ArchiveCore */,
+				2D03CCE9197BA8CE541E2B8B /* ArchiveEngines */,
+				EDB189B17E6AB24EEFB09314 /* PureZipFinderSupport */,
+				B310E43EEBEB0905E82C0A74 /* PureZipArchiveService */,
+				514497BC33CE2DEAC14BD509 /* PureZipFinderSync */,
+				C2880D8F3926FAF2A34344E7 /* PureZipQuickLook */,
+				4DB68CE147B94C03E5855A8F /* purezip-cli */,
+				1291BA1AB74B8914F4378522 /* PureZip */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		41DDD33795863C4AD56B2D17 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E547BC2D60C4AB3AB96DFC35 /* 7z-License.txt in Resources */,
+				847D08ED0685A207D79D59C8 /* AppIcon.icns in Resources */,
+				847D08ED0685A207D79D59C9 /* 7zz in Resources */,
+				10433C5CBD0A260CC9B29E9B /* model-viewer.min.js in Resources */,
+				9CC7C589CBF2A9684AD988B5 /* purezip-cli in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		07A286F59EB068374B413A70 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FBC8F2914783B32D37D7AB0F /* PureZipFinderSupport.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0B32D042568747E0FD8F02E2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				46A9DAB5D91D80A20F7A34E6 /* ArchiveCreationPurpose.swift in Sources */,
+				C2DA9862283A6D65D93488C5 /* ArchiveModels.swift in Sources */,
+				866AE8E7A3E285065F728766 /* ArchivePreviewSeedStore.swift in Sources */,
+				4B70BE65BCD1F8A79557BE6E /* ArchiveVolumeFamily.swift in Sources */,
+				4799CB1290C26742C7B8E043 /* EntryIndex.swift in Sources */,
+				EAFCF5F83C7176DB09EDD9DA /* LegacyCJKFilenameDecoder.swift in Sources */,
+				7178F66A4CAEC21A97CDC621 /* ManagedTemporaryArtifactRegistry.swift in Sources */,
+				4AD4BDBAD88D3A2060B52ABE /* PureZipPreferences.swift in Sources */,
+				434B882EF45CDA35E8E6945E /* WorkerProtocol.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		17FE48339C20B41344ED05A2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A7DF699E2278F828EDAA3293 /* PureZipArchiveServiceMain.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1AA1740E7DEE7EC04124F667 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0CCB5F2BAF61013278A76C5C /* ArchiveAssociationStore.swift in Sources */,
+				D6B65078745F1D9DAECCC943 /* ArchiveBrowsingSession.swift in Sources */,
+				B605AAC9AAF6394D623CDFFB /* ArchiveCreationDialogView.swift in Sources */,
+				6335B703975ECA8DBB78A0E1 /* ArchiveDragExportManager.swift in Sources */,
+				299E179383E88E503337E48C /* ArchiveEntryRenameSheet.swift in Sources */,
+				14EC96F45C74BF1AC127B495 /* ArchiveHoverPreview.swift in Sources */,
+				C79CA76F1B1B782751C3E9F8 /* ArchivePasswordPromptView.swift in Sources */,
+				DBA01BA1D85C81A33E04F91B /* BatchExtractionManager.swift in Sources */,
+				3A1C80EFC30665A0B631766E /* DeskViewModes.swift in Sources */,
+				1245ADD1B7387D49908F4475 /* InspectorMediaPlayers.swift in Sources */,
+				2B9CEA46AA136E2A54B15D21 /* MainWindowController.swift in Sources */,
+				4257EB4648BB2C921EBCF53D /* MediaPreviewExtractor.swift in Sources */,
+				47C734945BFCFD4881B5ED68 /* PureActionsRouter.swift in Sources */,
+				DAC21431B60C21B76060F577 /* PureZipAppMain.swift in Sources */,
+				8263EDEEE6A027C03035E41F /* PureZipAppViews.swift in Sources */,
+				E2BDCDDAB66F3ACB0A7C9B75 /* PureZipIcons.swift in Sources */,
+				DC7EF9541E04D30897432A1C /* PureZipLocalization.swift in Sources */,
+				0C73E34EA4F812B0C56B6874 /* PureZipStatusItemController.swift in Sources */,
+				85BB9390385B29AF53F807F4 /* PureZipUpdateManager.swift in Sources */,
+				7920A27B2FFAB7A7D41B1285 /* QuickLookPreviewController.swift in Sources */,
+				6D9052BE49E07D77C96C99EC /* SettingsView.swift in Sources */,
+				6CBA016E8D25F579E558A4AA /* SettingsWindowController.swift in Sources */,
+				729F6E01C5BF6C800B809F78 /* WindowsCompatibilityFixSheetView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4FB43F989560168DEEA274F1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C09F710FE0CFE574AE931E9F /* PureZipCLIMain.swift in Sources */,
+				EBD9A28FC2484EDED451B2D0 /* SelfTest.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4FEA0EBF63DD9D324EF79ACE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7373D1FDAFBB89F733B92672 /* PureZipFinderSyncMain.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CD0CF6CD2EF7CF3AE44A5B9E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				52272B249AB7F9A98320D23C /* ArchiveEngine.swift in Sources */,
+				5CF8A586224CFAE9850F6095 /* ArchiveEngineBroker.swift in Sources */,
+				87A266E3C9CBE9832B0B9ED5 /* BSDTarEngine.swift in Sources */,
+				71737B1A88ECA4D8953FCF6A /* OtherEngines.swift in Sources */,
+				EAC240D341D51A79912DFDD8 /* SevenZipEngine.swift in Sources */,
+				B69B298DA4B3921E6CB49FB3 /* SmartCompressionClassifier.swift in Sources */,
+				F21299419CBB2C925E984D4C /* ZIPEngine.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E7B3966BF844EE66B3D17972 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				10A6804FD41677FF2B8C6D87 /* PureZipQuickLookMain.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		0FFE2848D86BE2BB7B1D07BC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6B425E7D39ABE9A5F46A2338 /* ArchiveCore */;
+			targetProxy = 37BAFCEE1B3138B876972999 /* PBXContainerItemProxy */;
+		};
+		13889578A47C6BFD2A43F0C4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4DB68CE147B94C03E5855A8F /* purezip-cli */;
+			targetProxy = A5E7AFFB4237F314E54364EA /* PBXContainerItemProxy */;
+		};
+		20FDC0988E9E9B2206A7537C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2D03CCE9197BA8CE541E2B8B /* ArchiveEngines */;
+			targetProxy = 8ECBD09028BE4CEAE9069419 /* PBXContainerItemProxy */;
+		};
+		2FD768F5EBF7BA67793548E6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EDB189B17E6AB24EEFB09314 /* PureZipFinderSupport */;
+			targetProxy = 650C352E08D1CFCF0B76072C /* PBXContainerItemProxy */;
+		};
+		33693EEE716E17DDAE01A9A7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2D03CCE9197BA8CE541E2B8B /* ArchiveEngines */;
+			targetProxy = 5DDCB3765BF232BADA35E4BA /* PBXContainerItemProxy */;
+		};
+		5924892D77FDB9E62C0E057F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6B425E7D39ABE9A5F46A2338 /* ArchiveCore */;
+			targetProxy = AC20002584076C1636EA37E4 /* PBXContainerItemProxy */;
+		};
+		5CF7F1A4EC3FAF1FDBE71727 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6B425E7D39ABE9A5F46A2338 /* ArchiveCore */;
+			targetProxy = AD7DF4AF1E324EAB1C79732A /* PBXContainerItemProxy */;
+		};
+		5D5C627A909A67905373A37B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 514497BC33CE2DEAC14BD509 /* PureZipFinderSync */;
+			targetProxy = 9D5BF22A3E8D58B322E886B1 /* PBXContainerItemProxy */;
+		};
+		5EDBE930F919AB7C8B5CC0D6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6B425E7D39ABE9A5F46A2338 /* ArchiveCore */;
+			targetProxy = 53572AD7B833175F5222B504 /* PBXContainerItemProxy */;
+		};
+		6970300D1F2BE1BCB832750D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2D03CCE9197BA8CE541E2B8B /* ArchiveEngines */;
+			targetProxy = 383C0416C9A3E42042999034 /* PBXContainerItemProxy */;
+		};
+		7189A7281507E9C8BCFD4111 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6B425E7D39ABE9A5F46A2338 /* ArchiveCore */;
+			targetProxy = 50AEAB97F6735FE70D1CCEB2 /* PBXContainerItemProxy */;
+		};
+		7A7DD003C92337A440B29DA5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6B425E7D39ABE9A5F46A2338 /* ArchiveCore */;
+			targetProxy = 8CA773A55C3269491B269BB2 /* PBXContainerItemProxy */;
+		};
+		7EF9D0FB180F4B7C2D5093B4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B310E43EEBEB0905E82C0A74 /* PureZipArchiveService */;
+			targetProxy = 8424904F9425F1C0E779C7CC /* PBXContainerItemProxy */;
+		};
+		9FE40DA35614AE017A25D930 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EDB189B17E6AB24EEFB09314 /* PureZipFinderSupport */;
+			targetProxy = B85B613EF265EBAECD0CF989 /* PBXContainerItemProxy */;
+		};
+		B73DAFB0F5830EAFD24365A4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C2880D8F3926FAF2A34344E7 /* PureZipQuickLook */;
+			targetProxy = A94965EE35084CD8DFC727A7 /* PBXContainerItemProxy */;
+		};
+		DEE65F56EC701FAD0E069E98 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6B425E7D39ABE9A5F46A2338 /* ArchiveCore */;
+			targetProxy = 3ABBFD667C336481AAC56992 /* PBXContainerItemProxy */;
+		};
+		DF6787C43796825CADCAA5E0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2D03CCE9197BA8CE541E2B8B /* ArchiveEngines */;
+			targetProxy = 5A81E858DECC3D3092021C00 /* PBXContainerItemProxy */;
+		};
+		EA40C712629894430412291D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EDB189B17E6AB24EEFB09314 /* PureZipFinderSupport */;
+			targetProxy = B270CB9EB541D90C71B9D135 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0FAF152F5B1FA0ADB4C93DC9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu11 gnu++14";
+				PRODUCT_BUNDLE_IDENTIFIER = com.minato.purezip.FinderSupport;
+				PRODUCT_NAME = PureZipFinderSupport;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		1B43D5F754E86AE41578F8E2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 255;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		1EDC9C328C4CA201490FF183 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Support/PureZip-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.minato.purezip;
+				PRODUCT_NAME = PureZip;
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+			};
+			name = Release;
+		};
+		26055B62B97569469A740B5E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Support/PureZipArchiveService-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.minato.purezip.ArchiveService;
+				PRODUCT_NAME = PureZipArchiveService;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		30B66AF6A0275BBAA6D137A1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.minato.purezip-cli";
+				PRODUCT_NAME = "purezip-cli";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		3CF751D489DDDA33918C94D0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Support/PureZipArchiveService-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.minato.purezip.ArchiveService;
+				PRODUCT_NAME = PureZipArchiveService;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		4AB4822A61A68DAF9C5B676D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Support/PureZipFinderSync-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.minato.purezip.FinderSync;
+				PRODUCT_NAME = PureZipFinderSync;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		5492233BC2DD2A265808248E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Support/PureZipQuickLook-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.minato.purezip.QuickLook;
+				PRODUCT_NAME = PureZipQuickLook;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		6215FD1490FE50C2C0E0B20C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu11 gnu++14";
+				PRODUCT_BUNDLE_IDENTIFIER = com.minato.purezip.ArchiveEngines;
+				PRODUCT_NAME = ArchiveEngines;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		6D1CCBE7F54820DB57C04AA4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Support/PureZipFinderSync-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.minato.purezip.FinderSync;
+				PRODUCT_NAME = PureZipFinderSync;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		7B7E4F45AEAFCCFC28FD8B6D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 255;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		7BD879368FC6406FFF5C5858 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Support/PureZipQuickLook-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.minato.purezip.QuickLook;
+				PRODUCT_NAME = PureZipQuickLook;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		9EF8A219B1E26D363D7F8477 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu11 gnu++14";
+				PRODUCT_BUNDLE_IDENTIFIER = com.minato.purezip.ArchiveCore;
+				PRODUCT_NAME = ArchiveCore;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		A26B88A43097842171B2799E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu11 gnu++14";
+				PRODUCT_BUNDLE_IDENTIFIER = com.minato.purezip.ArchiveCore;
+				PRODUCT_NAME = ArchiveCore;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		E51C682648663DF64D85D06D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.minato.purezip-cli";
+				PRODUCT_NAME = "purezip-cli";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		EDFA7B8E91796E053CE452C0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu11 gnu++14";
+				PRODUCT_BUNDLE_IDENTIFIER = com.minato.purezip.ArchiveEngines;
+				PRODUCT_NAME = ArchiveEngines;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		F669DA11A6D05B04FAC15E01 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Support/PureZip-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.minato.purezip;
+				PRODUCT_NAME = PureZip;
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+			};
+			name = Debug;
+		};
+		FCEBDEFC3AF7A3AF7CB86E11 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu11 gnu++14";
+				PRODUCT_BUNDLE_IDENTIFIER = com.minato.purezip.FinderSupport;
+				PRODUCT_NAME = PureZipFinderSupport;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1A456A04FEE54FD6607C4234 /* Build configuration list for PBXNativeTarget "ArchiveEngines" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6215FD1490FE50C2C0E0B20C /* Debug */,
+				EDFA7B8E91796E053CE452C0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		23EDB197535821E7E79FE204 /* Build configuration list for PBXNativeTarget "PureZipQuickLook" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5492233BC2DD2A265808248E /* Debug */,
+				7BD879368FC6406FFF5C5858 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5CE83FA29BBD0AF0BD98C1BA /* Build configuration list for PBXNativeTarget "PureZipFinderSync" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6D1CCBE7F54820DB57C04AA4 /* Debug */,
+				4AB4822A61A68DAF9C5B676D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7897738093D5D2FF1F1A27ED /* Build configuration list for PBXNativeTarget "purezip-cli" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E51C682648663DF64D85D06D /* Debug */,
+				30B66AF6A0275BBAA6D137A1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7DF8CEF9319AFF04A459E7DC /* Build configuration list for PBXNativeTarget "ArchiveCore" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A26B88A43097842171B2799E /* Debug */,
+				9EF8A219B1E26D363D7F8477 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A1180C303D9C16F8725AF0AA /* Build configuration list for PBXProject "PureZip" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7B7E4F45AEAFCCFC28FD8B6D /* Debug */,
+				1B43D5F754E86AE41578F8E2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C64F83788160E21291646A79 /* Build configuration list for PBXNativeTarget "PureZipFinderSupport" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FCEBDEFC3AF7A3AF7CB86E11 /* Debug */,
+				0FAF152F5B1FA0ADB4C93DC9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C80459C5EAF5158966C33229 /* Build configuration list for PBXNativeTarget "PureZip" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F669DA11A6D05B04FAC15E01 /* Debug */,
+				1EDC9C328C4CA201490FF183 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E7A1DCB2A7A32CE636DBDC1B /* Build configuration list for PBXNativeTarget "PureZipArchiveService" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3CF751D489DDDA33918C94D0 /* Debug */,
+				26055B62B97569469A740B5E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 9102298EC1DCF68A403A47FF /* Project object */;
+}
