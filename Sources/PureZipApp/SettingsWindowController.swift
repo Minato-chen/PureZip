@@ -47,11 +47,19 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     public func close() {
         window?.orderOut(nil)
+        DockIconManager.shared.scheduleEvaluation()
     }
 
     // MARK: - NSWindowDelegate
 
+    public func windowShouldClose(_ sender: NSWindow) -> Bool {
+        sender.orderOut(nil)
+        DockIconManager.shared.scheduleEvaluation()
+        return false
+    }
+
     public func windowWillClose(_ notification: Notification) {
         // Kept in memory for instant re-opening
+        DockIconManager.shared.scheduleEvaluation()
     }
 }

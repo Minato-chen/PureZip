@@ -13,9 +13,8 @@ public final class PureZipApplicationDelegate: NSObject, NSApplicationDelegate {
     public func applicationDidFinishLaunching(_ notification: Notification) {
         ProcessInfo.processInfo.disableAutomaticTermination("PureZip resident menu bar and background integration")
         NSApp.servicesProvider = self
-        NSApp.setActivationPolicy(.regular)
+        DockIconManager.shared.evaluatePolicy()
         applyApplicationIconIfAvailable()
-        NSApp.activate(ignoringOtherApps: true)
         PureZipPreferences.shared.syncAppearance()
 
         // Initialize status item with left-click PureShelf popover & right-click context menu (Quit)

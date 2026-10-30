@@ -1934,7 +1934,7 @@ public final class ArchiveBrowsingSession: ObservableObject {
 
             try Data("""
             public struct DemoEngine {
-                public static let version = "1.0.0"
+                public static let version = "1.0.1"
             }
             """.utf8).write(to: srcDir.appendingPathComponent("DemoEngine.swift"))
 

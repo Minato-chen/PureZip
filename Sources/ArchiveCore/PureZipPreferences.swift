@@ -22,6 +22,7 @@ public final class PureZipPreferences: ObservableObject {
         static let autoLaunchAtLogin          = "PureZip.General.AutoLaunchAtLogin"
         static let appearanceMode             = "PureZip.General.AppearanceMode"
         static let appLanguage                = "PureZip.General.AppLanguage"
+        static let dockIconVisibilityMode     = "PureZip.General.DockIconVisibilityMode"
         static let defaultViewMode            = "PureZip.General.DefaultViewMode"
         static let includeAuxiliary           = "PureZip.General.IncludeAuxiliary"
         static let hoverPreviewEnabled        = "PureZip.General.HoverPreviewEnabled"
@@ -91,6 +92,14 @@ public final class PureZipPreferences: ObservableObject {
             } else {
                 defaults.removeObject(forKey: "AppleLanguages")
             }
+        }
+    }
+
+    /// Dock icon visibility mode: "never" (始终隐藏), "activeWindows" (仅在有窗口时显示), "always" (始终显示)
+    @Published public var dockIconVisibilityMode: String {
+        didSet {
+            defaults.set(dockIconVisibilityMode, forKey: Key.dockIconVisibilityMode)
+            NotificationCenter.default.post(name: Notification.Name("PureZipDockIconVisibilityModeChanged"), object: dockIconVisibilityMode)
         }
     }
 
@@ -271,6 +280,7 @@ public final class PureZipPreferences: ObservableObject {
         self.autoLaunchAtLogin = defaults.object(forKey: Key.autoLaunchAtLogin) as? Bool ?? true
         self.appearanceMode = defaults.string(forKey: Key.appearanceMode) ?? "auto"
         self.appLanguage = defaults.string(forKey: Key.appLanguage) ?? "system"
+        self.dockIconVisibilityMode = defaults.string(forKey: Key.dockIconVisibilityMode) ?? "never"
         self.defaultViewMode = defaults.string(forKey: Key.defaultViewMode) ?? "list"
         self.includeAuxiliary = defaults.object(forKey: Key.includeAuxiliary) as? Bool ?? false
         self.hoverPreviewEnabled = defaults.object(forKey: Key.hoverPreviewEnabled) as? Bool ?? true

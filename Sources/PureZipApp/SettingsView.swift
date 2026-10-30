@@ -31,6 +31,10 @@ public final class SettingsViewModel: ObservableObject {
             objectWillChange.send()
         }
     }
+    public var dockIconVisibilityMode: String {
+        get { prefs.dockIconVisibilityMode }
+        set { prefs.dockIconVisibilityMode = newValue; objectWillChange.send() }
+    }
     public var selectedDefaultViewMode: DeskViewMode {
         get {
             switch prefs.defaultViewMode.lowercased() {
@@ -526,6 +530,36 @@ public struct SettingsView: View {
                 }
                 .padding(16)
                 .background(Color(NSColor.controlBackgroundColor))
+                .cornerRadius(10)
+            }
+
+            // Dock 栏显示
+            VStack(alignment: .leading, spacing: 8) {
+                Text(L10n.t("程序坞与后台"))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                VStack(spacing: 0) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(L10n.t("程序坞（Dock）图标"))
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.primary)
+                            Text(L10n.t("选择 PureZip 在程序坞中的常驻行为。"))
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color(white: 0.55))
+                        }
+                        Spacer()
+                        Picker("", selection: $model.dockIconVisibilityMode) {
+                            Text(L10n.t("始终隐藏（默认）")).tag("never")
+                            Text(L10n.t("仅在有窗口时显示")).tag("activeWindows")
+                            Text(L10n.t("始终显示")).tag("always")
+                        }
+                        .frame(width: 170)
+                    }
+                    .padding(16)
+                    .background(Color(NSColor.controlBackgroundColor))
+                }
                 .cornerRadius(10)
             }
 

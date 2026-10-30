@@ -262,6 +262,7 @@ public final class ArchiveHoverPreviewPanelController {
             defer: false
         )
         p.isFloatingPanel = true
+        // Keep preview panel at floating level, beneath contextual popup menus (.popUpMenu)
         p.level = .floating
         p.hasShadow = true
         p.backgroundColor = .clear
@@ -378,9 +379,54 @@ public final class HoverPreviewCoordinator: ObservableObject {
     private var dismissTask: Task<Void, Never>?
     private var currentHoveredID: String?
     public private(set) var isPanelVisible: Bool = false
+    public private(set) var isMenuTracking: Bool = false
+    private weak var currentSession: ArchiveBrowsingSession?
+
+    private var eventMonitor: Any?
+
+    private init() {
+        // Dismiss preview immediately when right click or middle click happens
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown, .otherMouseDown]) { [weak self] event in
+            Task { @MainActor in
+                self?.hideAll()
+            }
+            return event
+        }
+
+        // Suppress and dismiss preview whenever a menu opens (context menu, popup menu, etc.)
+        NotificationCenter.default.addObserver(
+            forName: NSMenu.didBeginTrackingNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self = self else { return }
+                self.isMenuTracking = true
+                self.hideAll()
+            }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: NSMenu.didEndTrackingNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self = self else { return }
+                self.isMenuTracking = false
+            }
+        }
+    }
+
+    deinit {
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+    }
 
     public func onRowHover(entry: ArchiveEntry, isHovered: Bool, session: ArchiveBrowsingSession) {
-        guard PureZipPreferences.shared.hoverPreviewEnabled else {
+        currentSession = session
+        guard PureZipPreferences.shared.hoverPreviewEnabled, !isMenuTracking else {
             hidePanel(session: session)
             return
         }
@@ -413,7 +459,7 @@ public final class HoverPreviewCoordinator: ObservableObject {
                 if delayNanos > 0 {
                     try? await Task.sleep(nanoseconds: delayNanos)
                 }
-                guard !Task.isCancelled, self.currentHoveredID == entry.id else { return }
+                guard !Task.isCancelled, self.currentHoveredID == entry.id, !self.isMenuTracking else { return }
 
                 let mousePos = NSEvent.mouseLocation
                 session.hoveredCandidate = HoverPreviewCandidate(entry: entry, position: mousePos)
@@ -437,13 +483,17 @@ public final class HoverPreviewCoordinator: ObservableObject {
         }
     }
 
-    public func hidePanel(session: ArchiveBrowsingSession) {
+    public func hidePanel(session: ArchiveBrowsingSession?) {
         currentHoveredID = nil
         isPanelVisible = false
         hoverTask?.cancel()
         dismissTask?.cancel()
         ArchiveHoverPreviewPanelController.shared.hide()
-        session.hoveredCandidate = nil
+        session?.hoveredCandidate = nil
+    }
+
+    public func hideAll() {
+        hidePanel(session: currentSession)
     }
 }
 

@@ -109,6 +109,7 @@ public final class MainWindowController: NSObject, NSWindowDelegate {
 
     public func hide() {
         window?.orderOut(nil)
+        DockIconManager.shared.scheduleEvaluation()
     }
 
     // MARK: - NSWindowDelegate
@@ -116,10 +117,12 @@ public final class MainWindowController: NSObject, NSWindowDelegate {
     public func windowShouldClose(_ sender: NSWindow) -> Bool {
         // Hide window instead of destroying, keeping state completely intact for instant reopen
         sender.orderOut(nil)
+        DockIconManager.shared.scheduleEvaluation()
         return false
     }
 
     public func windowWillClose(_ notification: Notification) {
         // Extra safeguard
+        DockIconManager.shared.scheduleEvaluation()
     }
 }

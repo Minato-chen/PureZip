@@ -77,9 +77,9 @@ cat > "$XPC_BUNDLE/Contents/Info.plist" <<'EOF'
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>1.0.1</string>
     <key>CFBundleVersion</key>
-    <string>255</string>
+    <string>256</string>
     <key>XPCService</key>
     <dict>
         <key>ServiceType</key>
@@ -108,9 +108,9 @@ cat > "$FINDER_APPEX/Contents/Info.plist" <<'EOF'
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>1.0.1</string>
     <key>CFBundleVersion</key>
-    <string>255</string>
+    <string>256</string>
     <key>NSExtension</key>
     <dict>
         <key>NSExtensionPointIdentifier</key>
@@ -141,9 +141,9 @@ cat > "$QL_APPEX/Contents/Info.plist" <<'EOF'
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>1.0.1</string>
     <key>CFBundleVersion</key>
-    <string>255</string>
+    <string>256</string>
     <key>NSExtension</key>
     <dict>
         <key>NSExtensionAttributes</key>
