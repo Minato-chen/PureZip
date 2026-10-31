@@ -677,6 +677,24 @@ public struct DiskImageIconCanvasView: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color(white: 0.65))
                 Spacer()
+
+                Button {
+                    session.openCurrentDMGWithSystemMounter()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "externaldrive.badge.plus")
+                            .font(.system(size: 10))
+                        Text("使用系统挂载打开")
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .foregroundStyle(Color.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color(white: 0.22))
+                    .cornerRadius(4)
+                }
+                .buttonStyle(.plain)
+                .help("退出 PureZip 预览，使用 macOS 原生磁盘挂载工具打开此 DMG")
             }
             .padding(.horizontal, 20)
             .padding(.top, 14)
@@ -1163,43 +1181,65 @@ public struct CapsuleArchiveWindowView: View {
 
                         Spacer()
 
-                        if session.currentDescriptor?.format == .dmg && session.diskImagePresentation?.applicationBundleEntries.isEmpty == false {
-                            HStack(spacing: 2) {
+                        if session.currentDescriptor?.format == .dmg {
+                            HStack(spacing: 6) {
                                 Button {
-                                    session.dmgViewMode = .canvas
+                                    session.openCurrentDMGWithSystemMounter()
                                 } label: {
                                     HStack(spacing: 3) {
-                                        Image(systemName: "square.split.2x1")
+                                        Image(systemName: "externaldrive.badge.plus")
                                             .font(.system(size: 10))
-                                        Text("画布")
+                                        Text("系统挂载")
                                             .font(.system(size: 10, weight: .medium))
                                     }
-                                    .foregroundStyle(session.dmgViewMode == .canvas ? Color.primary : Color.secondary)
+                                    .foregroundStyle(Color.secondary)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 3)
-                                    .background(session.dmgViewMode == .canvas ? (colorScheme == .dark ? Color(white: 0.28) : Color(white: 0.88)) : Color.clear)
+                                    .background(Color(NSColor.controlBackgroundColor))
                                     .cornerRadius(4)
                                 }
                                 .buttonStyle(.plain)
-                                .help("拖拽安装画布")
+                                .help("使用系统原生方式装载此磁盘映像")
 
-                                Button {
-                                    session.dmgViewMode = .list
-                                } label: {
-                                    HStack(spacing: 3) {
-                                        Image(systemName: "list.bullet")
-                                            .font(.system(size: 10))
-                                        Text("列表")
-                                            .font(.system(size: 10, weight: .medium))
+                                if session.diskImagePresentation?.applicationBundleEntries.isEmpty == false {
+                                    HStack(spacing: 2) {
+                                        Button {
+                                            session.dmgViewMode = .canvas
+                                        } label: {
+                                            HStack(spacing: 3) {
+                                                Image(systemName: "square.split.2x1")
+                                                    .font(.system(size: 10))
+                                                Text("画布")
+                                                    .font(.system(size: 10, weight: .medium))
+                                            }
+                                            .foregroundStyle(session.dmgViewMode == .canvas ? Color.primary : Color.secondary)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 3)
+                                            .background(session.dmgViewMode == .canvas ? (colorScheme == .dark ? Color(white: 0.28) : Color(white: 0.88)) : Color.clear)
+                                            .cornerRadius(4)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .help("拖拽安装画布")
+
+                                        Button {
+                                            session.dmgViewMode = .list
+                                        } label: {
+                                            HStack(spacing: 3) {
+                                                Image(systemName: "list.bullet")
+                                                    .font(.system(size: 10))
+                                                Text("列表")
+                                                    .font(.system(size: 10, weight: .medium))
+                                            }
+                                            .foregroundStyle(session.dmgViewMode == .list ? Color.primary : Color.secondary)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 3)
+                                            .background(session.dmgViewMode == .list ? (colorScheme == .dark ? Color(white: 0.28) : Color(white: 0.88)) : Color.clear)
+                                            .cornerRadius(4)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .help("文件列表视图")
                                     }
-                                    .foregroundStyle(session.dmgViewMode == .list ? Color.primary : Color.secondary)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 3)
-                                    .background(session.dmgViewMode == .list ? (colorScheme == .dark ? Color(white: 0.28) : Color(white: 0.88)) : Color.clear)
-                                    .cornerRadius(4)
                                 }
-                                .buttonStyle(.plain)
-                                .help("文件列表视图")
                             }
                         }
                     }

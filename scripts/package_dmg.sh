@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 
 export DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
 
-VERSION="1.0.2"
+VERSION="1.0.3"
 APP_NAME="PureZip"
 DMG_NAME="${APP_NAME}-${VERSION}-arm64.dmg"
 DIST_DIR="$ROOT_DIR/dist"

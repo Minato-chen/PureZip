@@ -395,14 +395,19 @@ public struct ArchiveEntry: Codable, Sendable, Hashable, Identifiable {
         ArchiveBrowserProjection.canonicalDirectoryPath(path)
     }
 
-    /// Auxiliary macOS metadata entries (`__MACOSX`, `.DS_Store`, `._*` AppleDouble, raw disk partitions).
+    /// Auxiliary macOS metadata entries (`__MACOSX`, `.DS_Store`, `._*` AppleDouble, raw disk partitions, HFS+ private system structures).
     public var isAuxiliary: Bool {
         let comps = path.split(separator: "/")
         if comps.contains("__MACOSX") { return true }
+        if comps.contains(".fseventsd") || comps.contains(".Trashes") { return true }
         guard let last = comps.last else { return false }
         if last == ".DS_Store" || last.hasPrefix("._") { return true }
         let lastStr = String(last)
         let lowerLast = lastStr.lowercased()
+        if lowerLast.contains("[hfs+ private data]") || lowerLast.contains(".hfs+ private directory data") ||
+            lowerLast.contains("hfs+ private") {
+            return true
+        }
         if lowerLast.hasSuffix(".apfs") || lowerLast.hasSuffix(".hfs") || lowerLast.hasSuffix(".hfsx") ||
             lastStr == "0.Apple_partition_map" || lastStr == "0.MBR" ||
             lastStr.contains("Apple_APFS") || lastStr.contains("Apple_HFS") ||
@@ -416,7 +421,7 @@ public struct ArchiveEntry: Codable, Sendable, Hashable, Identifiable {
     /// Disk image hidden `.background` directory or files.
     public var isDiskImageBackground: Bool {
         let comps = path.split(separator: "/")
-        return comps.first == ".background"
+        return comps.contains(".background")
     }
 
     /// Disk image top-level `Applications` symlink pointing to `/Applications`.

@@ -383,7 +383,11 @@ public final class ArchiveBrowsingSession: ObservableObject {
             try refreshDisplayedEntries()
             if desc.format == .dmg {
                 let roots = (try? newIndex.children(of: "", limit: 100, includeAuxiliary: true, includeDiskImageBackground: true, includeDMGApplicationsShortcut: true)) ?? []
-                let apps = roots.filter { $0.path.lowercased().hasSuffix(".app") || $0.name.lowercased().hasSuffix(".app") }
+                var apps = roots.filter { $0.path.lowercased().hasSuffix(".app") || $0.name.lowercased().hasSuffix(".app") }
+                // Smart subfolder detection: if no .app in root, look for shallow nested .app (e.g. BarbeeHelper/BarbeeHelper.app)
+                if apps.isEmpty, let candidateApps = try? newIndex.findApplicationBundles(limit: 5), !candidateApps.isEmpty {
+                    apps = candidateApps
+                }
                 let hasShortcut = roots.contains { $0.isDMGApplicationsShortcut }
                 self.diskImagePresentation = DiskImagePresentation(
                     rootEntries: roots.filter { !$0.isAuxiliary && !$0.isDiskImageBackground },
@@ -546,6 +550,34 @@ public final class ArchiveBrowsingSession: ObservableObject {
             }
         }
         performCloseArchive()
+    }
+
+    /// Mounts the current DMG file with the macOS system DiskImageMounter/hdiutil and exits PureZip handling.
+    public func openCurrentDMGWithSystemMounter() {
+        guard let url = currentArchiveURL, currentDescriptor?.format == .dmg else { return }
+        let dmgPath = url.path
+
+        // Close PureZip's session and release locks
+        closeArchive()
+
+        // Hide or close the window if applicable
+        mainWindow?.orderOut(nil)
+
+        // Launch with system DiskImageMounter or hdiutil attach
+        DispatchQueue.global(qos: .userInitiated).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            process.arguments = ["-a", "DiskImageMounter", dmgPath]
+            do {
+                try process.run()
+            } catch {
+                // Fallback to /usr/bin/hdiutil attach
+                let fallback = Process()
+                fallback.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+                fallback.arguments = ["attach", dmgPath]
+                try? fallback.run()
+            }
+        }
     }
 
     private func performCloseArchive() {
@@ -1620,7 +1652,10 @@ public final class ArchiveBrowsingSession: ObservableObject {
             self.indexRevision += 1
             if desc.format == .dmg {
                 let roots = (try? newIndex.children(of: "", limit: 100, includeAuxiliary: true, includeDiskImageBackground: true, includeDMGApplicationsShortcut: true)) ?? []
-                let apps = roots.filter { $0.path.lowercased().hasSuffix(".app") || $0.name.lowercased().hasSuffix(".app") }
+                var apps = roots.filter { $0.path.lowercased().hasSuffix(".app") || $0.name.lowercased().hasSuffix(".app") }
+                if apps.isEmpty, let candidateApps = try? newIndex.findApplicationBundles(limit: 5), !candidateApps.isEmpty {
+                    apps = candidateApps
+                }
                 let hasShortcut = roots.contains { $0.isDMGApplicationsShortcut }
                 self.diskImagePresentation = DiskImagePresentation(
                     rootEntries: roots.filter { !$0.isAuxiliary && !$0.isDiskImageBackground },
@@ -1934,7 +1969,7 @@ public final class ArchiveBrowsingSession: ObservableObject {
 
             try Data("""
             public struct DemoEngine {
-                public static let version = "1.0.2"
+                public static let version = "1.0.3"
             }
             """.utf8).write(to: srcDir.appendingPathComponent("DemoEngine.swift"))
 

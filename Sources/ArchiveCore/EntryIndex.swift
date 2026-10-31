@@ -513,6 +513,30 @@ public final class EntryIndex: @unchecked Sendable {
         return Int(sqlite3_column_int64(stmt, 0))
     }
 
+    /// Searches for top-level or single-subfolder nested application bundle roots (`.app`).
+    public func findApplicationBundles(limit: Int = 10) throws -> [ArchiveEntry] {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db = database else { throw EntryIndexError.closed }
+
+        // Find entries whose path ends in .app or contains .app/ where the directory level is shallow (<= 2 slashes)
+        let sql = """
+        SELECT payload FROM entries
+        WHERE (path LIKE '%.app' OR path LIKE '%.app/' OR name LIKE '%.app')
+          AND is_auxiliary = 0
+          AND is_disk_image_background = 0
+        ORDER BY path COLLATE NOCASE
+        LIMIT ?;
+        """
+        var stmt: OpaquePointer?
+        defer { if let stmt { sqlite3_finalize(stmt) } }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw currentError(db)
+        }
+        sqlite3_bind_int64(stmt, 1, Int64(limit))
+        return try readEntriesFromStatement(stmt)
+    }
+
     /// Subtree range query for all descendant entries under `directoryPath`:
     /// `SELECT payload FROM entries WHERE path = ? COLLATE BINARY OR (path >= ? COLLATE BINARY AND path < ? COLLATE BINARY) ORDER BY path COLLATE NOCASE;`
     public func descendants(of directoryPath: String) throws -> [ArchiveEntry] {
