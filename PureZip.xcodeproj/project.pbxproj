@@ -84,6 +84,7 @@
 		F24DCE15528FE20FA2FE5C7F /* PureZipFinderSync.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E1B1E74FD844615F5A137111 /* PureZipFinderSync.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		F5307BADA0D5275598580642 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 3BBD1B2CAAEF40B7CA54F445 /* libsqlite3.tbd */; };
 		FBC8F2914783B32D37D7AB0F /* PureZipFinderSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BA0B2C004F6C328A562A8A8 /* PureZipFinderSupport.swift */; };
+		D476E42EE0089FE803C6E153 /* DockIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 413DBF24C44CA8EBE7AEB96A /* DockIconManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -317,6 +318,7 @@
 		F783248DD23708CB65D9F709 /* ZIPEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZIPEngine.swift; sourceTree = "<group>"; };
 		F8D107351CB5754394BD89D0 /* ArchiveEntryRenameSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveEntryRenameSheet.swift; sourceTree = "<group>"; };
 		FA38C8F70C5CA11273AD21C0 /* WindowsCompatibilityFixSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsCompatibilityFixSheetView.swift; sourceTree = "<group>"; };
+		413DBF24C44CA8EBE7AEB96A /* DockIconManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockIconManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -403,6 +405,7 @@
 		0300C07D942C6E842BE28411 /* PureZipApp */ = {
 			isa = PBXGroup;
 			children = (
+				413DBF24C44CA8EBE7AEB96A /* DockIconManager.swift */,
 				9861E634188DEC401D71F304 /* ArchiveAssociationStore.swift */,
 				20F739603314BF789D4C33DE /* ArchiveBrowsingSession.swift */,
 				253AB72BD8F9D4A8FBAF2219 /* ArchiveCreationDialogView.swift */,
@@ -847,6 +850,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D476E42EE0089FE803C6E153 /* DockIconManager.swift in Sources */,
 				0CCB5F2BAF61013278A76C5C /* ArchiveAssociationStore.swift in Sources */,
 				D6B65078745F1D9DAECCC943 /* ArchiveBrowsingSession.swift in Sources */,
 				B605AAC9AAF6394D623CDFFB /* ArchiveCreationDialogView.swift in Sources */,

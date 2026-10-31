@@ -66,6 +66,7 @@ public final class PureZipPreferences: ObservableObject {
 
         static let associationState           = "PureZip.Associations.State"
         static let autoCheckUpdates           = "PureZip.About.AutoCheckUpdates"
+        static let preferencesSchemaVersion   = "PureZip.Internal.PreferencesSchemaVersion"
     }
 
     // MARK: - 1. 通用 (General)
@@ -276,6 +277,9 @@ public final class PureZipPreferences: ObservableObject {
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
+        // Migrate preferences across versions if necessary
+        Self.migratePreferencesIfNeeded(defaults: defaults)
+
         // 1. General
         self.autoLaunchAtLogin = defaults.object(forKey: Key.autoLaunchAtLogin) as? Bool ?? true
         self.appearanceMode = defaults.string(forKey: Key.appearanceMode) ?? "auto"
@@ -356,6 +360,39 @@ public final class PureZipPreferences: ObservableObject {
         // Initial system sync
         syncAppearance()
         refreshTemporaryDiskUsage()
+    }
+
+    // MARK: - Preferences Schema Migration
+
+    public static let currentPreferencesSchemaVersion: Int = 1
+
+    /// Automatically migrates preferences across version upgrades, preserving user choices
+    /// and safely handling deprecated or restructured configuration keys.
+    public static func migratePreferencesIfNeeded(defaults: UserDefaults) {
+        let storedVersion = defaults.integer(forKey: Key.preferencesSchemaVersion)
+        guard storedVersion < currentPreferencesSchemaVersion else { return }
+
+        // Migration step: Version 0 -> 1
+        if storedVersion < 1 {
+            // e.g. Legacy Dock icon boolean migrated to tripartite dockIconVisibilityMode
+            if let legacyDockBool = defaults.object(forKey: "PureZip.General.ShowDockIcon") as? Bool {
+                if defaults.object(forKey: Key.dockIconVisibilityMode) == nil {
+                    defaults.set(legacyDockBool ? "always" : "never", forKey: Key.dockIconVisibilityMode)
+                }
+                defaults.removeObject(forKey: "PureZip.General.ShowDockIcon")
+            }
+
+            // Prune any legacy / abandoned preference keys from early experimental builds
+            let deprecatedKeys: [String] = [
+                "PureZip.PureCapsule.LegacyAlphaStyle",
+                "PureZip.General.LegacyToolbarMode"
+            ]
+            for key in deprecatedKeys {
+                defaults.removeObject(forKey: key)
+            }
+        }
+
+        defaults.set(currentPreferencesSchemaVersion, forKey: Key.preferencesSchemaVersion)
     }
 
     // MARK: - System Synchronizations

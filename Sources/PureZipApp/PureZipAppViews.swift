@@ -769,7 +769,9 @@ public struct DiskImageIconCanvasView: View {
                     .frame(width: 120)
                     .contentShape(Rectangle())
                     .onDrop(of: [.plainText, .text, .item, .data, .fileURL], isTargeted: $isTargeted) { _ in
-                        triggerInstall(app)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            triggerInstall(app)
+                        }
                         return true
                     }
                 }
