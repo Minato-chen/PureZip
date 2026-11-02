@@ -384,11 +384,17 @@ public final class ArchiveBrowsingSession: ObservableObject {
             if desc.format == .dmg {
                 let roots = (try? newIndex.children(of: "", limit: 100, includeAuxiliary: true, includeDiskImageBackground: true, includeDMGApplicationsShortcut: true)) ?? []
                 var apps = roots.filter { $0.path.lowercased().hasSuffix(".app") || $0.name.lowercased().hasSuffix(".app") }
-                // Smart subfolder detection: if no .app in root, look for shallow nested .app (e.g. BarbeeHelper/BarbeeHelper.app)
+                // Smart subfolder detection: if no .app in root, look for shallow nested .app (e.g. PhotoCraft/PhotoCraft.app)
                 if apps.isEmpty, let candidateApps = try? newIndex.findApplicationBundles(limit: 5), !candidateApps.isEmpty {
                     apps = candidateApps
                 }
-                let hasShortcut = roots.contains { $0.isDMGApplicationsShortcut }
+                var hasShortcut = roots.contains { $0.isDMGApplicationsShortcut }
+                if !hasShortcut, let app = apps.first {
+                    let parent = app.parentPath
+                    if !parent.isEmpty, let siblings = try? newIndex.children(of: parent, limit: 50, includeAuxiliary: true, includeDiskImageBackground: true, includeDMGApplicationsShortcut: true) {
+                        hasShortcut = siblings.contains { $0.isDMGApplicationsShortcut }
+                    }
+                }
                 self.diskImagePresentation = DiskImagePresentation(
                     rootEntries: roots.filter { !$0.isAuxiliary && !$0.isDiskImageBackground },
                     applicationBundleEntries: apps,
@@ -505,6 +511,30 @@ public final class ArchiveBrowsingSession: ObservableObject {
                 includeDiskImageBackground: includeDiskBackground,
                 includeDMGApplicationsShortcut: includeDMGShortcuts
             )
+            // Smart single-root or missing-root unwrapping:
+            // If at root and children is empty while totalIndexedCount > 0, fallback to direct entry search
+            if currentDirectoryPath.isEmpty && displayedEntries.isEmpty && totalIndexedCount > 0 {
+                let allEntries = (try? index.page(search: "", offset: 0, limit: 1000, includeAuxiliary: includeAuxiliary, includeDiskImageBackground: includeDiskBackground, includeDMGApplicationsShortcut: includeDMGShortcuts)) ?? []
+                if !allEntries.isEmpty {
+                    let rootSegs = Set(allEntries.compactMap { entry -> String? in
+                        let parts = entry.path.split(separator: "/")
+                        return parts.count > 1 ? String(parts[0]) : nil
+                    })
+                    if rootSegs.count == 1, let singleRoot = rootSegs.first {
+                        self.currentDirectoryPath = singleRoot
+                        displayedEntries = (try? index.children(
+                            of: singleRoot,
+                            offset: 0,
+                            limit: 1000,
+                            includeAuxiliary: includeAuxiliary,
+                            includeDiskImageBackground: includeDiskBackground,
+                            includeDMGApplicationsShortcut: includeDMGShortcuts
+                        )) ?? allEntries
+                    } else {
+                        displayedEntries = allEntries
+                    }
+                }
+            }
         }
         containsNestedArchives = displayedEntries.contains(where: \.isNestedArchive)
     }
@@ -561,7 +591,7 @@ public final class ArchiveBrowsingSession: ObservableObject {
         closeArchive()
 
         // Hide or close the window if applicable
-        mainWindow?.orderOut(nil)
+        MainWindowController.shared.hide()
 
         // Launch with system DiskImageMounter or hdiutil attach
         DispatchQueue.global(qos: .userInitiated).async {
@@ -1256,7 +1286,8 @@ public final class ArchiveBrowsingSession: ObservableObject {
 
             // Auto-close window if enabled
             if PureZipPreferences.shared.autoCloseAfterExtraction {
-                self.currentArchiveURL = nil
+                self.closeArchive()
+                MainWindowController.shared.hide()
             }
         } catch {
             let errString = error.localizedDescription.lowercased()
@@ -1969,7 +2000,7 @@ public final class ArchiveBrowsingSession: ObservableObject {
 
             try Data("""
             public struct DemoEngine {
-                public static let version = "1.0.3"
+                public static let version = "1.0.4"
             }
             """.utf8).write(to: srcDir.appendingPathComponent("DemoEngine.swift"))
 

@@ -299,7 +299,7 @@ public final class PureZipPreferences: ObservableObject {
         // 3. Extraction
         self.quickExtractOnDoubleClick = defaults.bool(forKey: Key.quickExtractOnDoubleClick)
         self.extractionPostAction = defaults.string(forKey: Key.extractionPostAction) ?? "每次均询问"
-        self.autoCloseAfterExtraction = defaults.bool(forKey: Key.autoCloseAfterExtraction)
+        self.autoCloseAfterExtraction = defaults.object(forKey: Key.autoCloseAfterExtraction) as? Bool ?? true
         self.autoExcludeSystemAuxiliary = defaults.object(forKey: Key.autoExcludeSystemAuxiliary) as? Bool ?? true
         self.autoFilterDMGAuxiliary = defaults.object(forKey: Key.autoFilterDMGAuxiliary) as? Bool ?? true
 
@@ -567,7 +567,7 @@ public final class PureZipPreferences: ObservableObject {
 
         quickExtractOnDoubleClick = false
         extractionPostAction = "每次均询问"
-        autoCloseAfterExtraction = false
+        autoCloseAfterExtraction = true
         autoExcludeSystemAuxiliary = true
         autoFilterDMGAuxiliary = true
 

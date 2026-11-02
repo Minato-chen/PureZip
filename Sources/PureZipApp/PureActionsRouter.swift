@@ -255,10 +255,12 @@ public final class PureActionsRouter {
                 if response == .alertFirstButtonReturn {
                     NSWorkspace.shared.recycle([archiveURL]) { _, _ in }
                     session.closeArchive()
+                    MainWindowController.shared.hide()
                     NSWorkspace.shared.activateFileViewerSelecting([targetURL])
                     return "已将 “\(appName)” 安装至 /Applications，并已推出且移除 DMG 映像"
                 } else {
                     session.closeArchive()
+                    MainWindowController.shared.hide()
                     NSWorkspace.shared.activateFileViewerSelecting([targetURL])
                     return "已将 “\(appName)” 安装至 /Applications，并已自动推出 DMG 映像"
                 }
@@ -283,7 +285,8 @@ public final class PureActionsRouter {
 
             // Pure Actions Auto Close: Dismiss window if enabled
             if PureZipPreferences.shared.pureActionsAutoClose {
-                session.currentArchiveURL = nil
+                session.closeArchive()
+                MainWindowController.shared.hide()
             }
 
             NSWorkspace.shared.activateFileViewerSelecting([targetURL])

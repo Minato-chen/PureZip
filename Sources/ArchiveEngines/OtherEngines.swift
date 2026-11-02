@@ -320,8 +320,11 @@ public struct DiskImageEngine: ArchiveEngine {
             collected.append(contentsOf: batch)
         }
         let roots = ArchiveBrowserProjection.directChildren(of: collected, in: "", includeAuxiliary: true)
-        let apps = roots.filter { $0.path.lowercased().hasSuffix(".app") }
-        let hasShortcut = roots.contains { $0.isDMGApplicationsShortcut }
+        var apps = roots.filter { $0.path.lowercased().hasSuffix(".app") }
+        if apps.isEmpty {
+            apps = collected.filter { $0.path.lowercased().hasSuffix(".app") || $0.name.lowercased().hasSuffix(".app") }
+        }
+        let hasShortcut = collected.contains { $0.isDMGApplicationsShortcut }
         return DiskImagePresentation(
             rootEntries: roots.filter { !$0.isAuxiliary && !$0.isDiskImageBackground },
             applicationBundleEntries: apps,

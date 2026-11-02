@@ -127,6 +127,14 @@ public enum PureZipSelfTestSuite {
         try assertEqual(newSrcChildren.map(\.path), ["src_v2/core", "src_v2/ui"])
         let newCoreChildren = try index.children(of: "src_v2/core")
         try assertEqual(newCoreChildren.map(\.path), ["src_v2/core/engine.swift", "src_v2/core/index.swift"])
+
+        // Test findApplicationBundles with volume-wrapped app and nested Applications symlink
+        let nestedAppEntry = ArchiveEntry(path: "PhotoCraft/PhotoCraft.app", type: .directory)
+        let nestedSymlink = ArchiveEntry(path: "PhotoCraft/Applications", type: .symbolicLink, linkTarget: "/Applications")
+        try index.insert([nestedAppEntry, nestedSymlink])
+        let appBundles = try index.findApplicationBundles()
+        try assertTrue(appBundles.contains(where: { $0.path.contains("PhotoCraft.app") }), "findApplicationBundles must find nested .app")
+        try assertTrue(nestedSymlink.isDMGApplicationsShortcut, "Nested Applications symlink must be recognized as isDMGApplicationsShortcut")
     }
 
     public static func testLegacyCJKFilenameDecoding() throws {

@@ -522,7 +522,7 @@ public final class EntryIndex: @unchecked Sendable {
         // Find entries whose path ends in .app or contains .app/ where the directory level is shallow (<= 2 slashes)
         let sql = """
         SELECT payload FROM entries
-        WHERE (path LIKE '%.app' OR path LIKE '%.app/' OR name LIKE '%.app')
+        WHERE (path LIKE '%.app' OR path LIKE '%.app/' OR path LIKE '%.app/%')
           AND is_auxiliary = 0
           AND is_disk_image_background = 0
         ORDER BY path COLLATE NOCASE

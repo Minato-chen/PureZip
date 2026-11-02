@@ -424,10 +424,17 @@ public struct ArchiveEntry: Codable, Sendable, Hashable, Identifiable {
         return comps.contains(".background")
     }
 
-    /// Disk image top-level `Applications` symlink pointing to `/Applications`.
+    /// Disk image top-level or volume-wrapped `Applications` symlink pointing to `/Applications`.
     public var isDMGApplicationsShortcut: Bool {
-        let trimmed = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        return trimmed == "Applications" && type == .symbolicLink && (linkTarget == "/Applications" || linkTarget == nil)
+        let normalized = path.replacingOccurrences(of: "\\", with: "/")
+        let comps = normalized.split(separator: "/").map(String.init)
+        guard let last = comps.last else { return false }
+        let isAppSymlink = (last == "Applications" || last == "Applications.localized")
+        guard isAppSymlink && type == .symbolicLink else { return false }
+        if let target = linkTarget {
+            return target == "/Applications" || target == "/Applications/" || target.hasSuffix("Applications")
+        }
+        return true
     }
 
     /// Detects whether this entry is a nested archive container based on its filename extension.
@@ -448,7 +455,8 @@ public struct ArchiveEntry: Codable, Sendable, Hashable, Identifiable {
 
 public enum ArchiveBrowserProjection {
     public static func canonicalDirectoryPath(_ path: String) -> String {
-        let parts = path.split(separator: "/").filter { !$0.isEmpty && $0 != "." }
+        let normalized = path.replacingOccurrences(of: "\\", with: "/")
+        let parts = normalized.split(separator: "/").filter { !$0.isEmpty && $0 != "." }
         return parts.joined(separator: "/")
     }
 

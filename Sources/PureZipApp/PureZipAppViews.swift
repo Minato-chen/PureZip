@@ -647,8 +647,10 @@ public struct PureZipWelcomeView: View {
 
 public struct DiskImageIconCanvasView: View {
     @ObservedObject var session: ArchiveBrowsingSession
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isTargeted: Bool = false
     @State private var isInstalling: Bool = false
+    @State private var isMounterHovered: Bool = false
 
     private var appEntry: ArchiveEntry? {
         session.diskImagePresentation?.applicationBundleEntries.first
@@ -671,29 +673,55 @@ public struct DiskImageIconCanvasView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Instruction header
-            HStack {
+            // Instruction header with enhanced Prominent System Mount button (Option B)
+            HStack(alignment: .center) {
                 Text("拖移应用至“应用程序”文件夹完成安装")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color(white: 0.65))
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(.secondary)
+
                 Spacer()
 
                 Button {
                     session.openCurrentDMGWithSystemMounter()
                 } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 5) {
                         Image(systemName: "externaldrive.badge.plus")
-                            .font(.system(size: 10))
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color(red: 0.05, green: 0.48, blue: 0.98))
+
                         Text("使用系统挂载打开")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(size: 11.5, weight: .semibold))
+                            .foregroundStyle(isMounterHovered ? Color.primary : Color.primary.opacity(0.85))
                     }
-                    .foregroundStyle(Color.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Color(white: 0.22))
-                    .cornerRadius(4)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7)
+                            .fill(
+                                isMounterHovered
+                                    ? (colorScheme == .dark ? Color.white.opacity(0.18) : Color.black.opacity(0.09))
+                                    : (colorScheme == .dark ? Color.white.opacity(0.10) : Color.black.opacity(0.05))
+                            )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 7)
+                            .stroke(
+                                colorScheme == .dark ? Color.white.opacity(0.15) : Color.black.opacity(0.10),
+                                lineWidth: 1
+                            )
+                    )
+                    .shadow(
+                        color: Color.black.opacity(colorScheme == .dark ? 0.20 : 0.05),
+                        radius: 2,
+                        y: 1
+                    )
                 }
                 .buttonStyle(.plain)
+                .onHover { isHovered in
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        isMounterHovered = isHovered
+                    }
+                }
                 .help("退出 PureZip 预览，使用 macOS 原生磁盘挂载工具打开此 DMG")
             }
             .padding(.horizontal, 20)
@@ -710,10 +738,10 @@ public struct DiskImageIconCanvasView: View {
                         Image(nsImage: appIcon)
                             .resizable()
                             .frame(width: 84, height: 84)
-                            .shadow(color: Color.black.opacity(0.40), radius: 10, y: 5)
+                            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.40 : 0.18), radius: 10, y: 5)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 18)
-                                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                                    .stroke(colorScheme == .dark ? Color.white.opacity(0.15) : Color.black.opacity(0.08), lineWidth: 1)
                             )
                             .onDrag {
                                 ArchiveDragExportManager.shared.itemProvider(for: app, session: session)
@@ -721,16 +749,18 @@ public struct DiskImageIconCanvasView: View {
 
                         Text(app.name)
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .lineLimit(1)
 
                         Text("可拖动")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(Color(white: 0.55))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color(white: 0.20))
-                            .cornerRadius(4)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2.5)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4.5)
+                                    .fill(colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.06))
+                            )
                     }
                     .frame(width: 120)
 
@@ -749,18 +779,27 @@ public struct DiskImageIconCanvasView: View {
 
                         Text("拖入安装")
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color(white: 0.60))
+                            .foregroundStyle(.secondary)
                     }
 
                     // 3. Drop Target: Applications Folder
                     VStack(spacing: 8) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 18)
-                                .fill(isTargeted ? Color.blue.opacity(0.25) : Color(white: 0.16))
+                                .fill(
+                                    isTargeted
+                                        ? Color.blue.opacity(0.25)
+                                        : (colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.05))
+                                )
                                 .frame(width: 96, height: 96)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 18)
-                                        .stroke(isTargeted ? Color.blue : Color.white.opacity(0.20), lineWidth: isTargeted ? 2 : 1)
+                                        .stroke(
+                                            isTargeted
+                                                ? Color.blue
+                                                : (colorScheme == .dark ? Color.white.opacity(0.16) : Color.black.opacity(0.10)),
+                                            lineWidth: isTargeted ? 2 : 1
+                                        )
                                 )
                                 .scaleEffect(isTargeted ? 1.08 : 1.0)
                                 .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isTargeted)
@@ -768,21 +807,31 @@ public struct DiskImageIconCanvasView: View {
                             Image(nsImage: applicationsIcon)
                                 .resizable()
                                 .frame(width: 80, height: 80)
-                                .shadow(color: isTargeted ? Color.blue.opacity(0.6) : Color.black.opacity(0.35), radius: 10, y: 5)
+                                .shadow(
+                                    color: isTargeted ? Color.blue.opacity(0.6) : Color.black.opacity(colorScheme == .dark ? 0.35 : 0.16),
+                                    radius: 10,
+                                    y: 5
+                                )
                         }
 
                         Text("Applications")
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(isTargeted ? Color.blue : .white)
+                            .foregroundStyle(isTargeted ? Color.blue : .primary)
                             .lineLimit(1)
 
                         Text("释放至此")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(isTargeted ? Color.blue : Color(white: 0.55))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(isTargeted ? Color.blue.opacity(0.2) : Color(white: 0.20))
-                            .cornerRadius(4)
+                            .foregroundStyle(isTargeted ? Color.blue : .secondary)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2.5)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4.5)
+                                    .fill(
+                                        isTargeted
+                                            ? Color.blue.opacity(0.2)
+                                            : (colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.06))
+                                    )
+                            )
                     }
                     .frame(width: 120)
                     .contentShape(Rectangle())
@@ -797,7 +846,7 @@ public struct DiskImageIconCanvasView: View {
             } else {
                 Text("此磁盘映像中未检测到应用程序包")
                     .font(.system(size: 13))
-                    .foregroundStyle(Color(white: 0.6))
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
@@ -808,6 +857,9 @@ public struct DiskImageIconCanvasView: View {
         }
         .frame(minWidth: 360, maxWidth: .infinity, minHeight: 340, maxHeight: .infinity)
         .background(
+            (colorScheme == .dark ? Color(white: 0.12) : Color(white: 0.97)).opacity(0.20)
+        )
+        .overlay(
             Button("") {
                 Task { await session.reloadArchiveInPlace() }
             }
@@ -1186,17 +1238,18 @@ public struct CapsuleArchiveWindowView: View {
                                 Button {
                                     session.openCurrentDMGWithSystemMounter()
                                 } label: {
-                                    HStack(spacing: 3) {
+                                    HStack(spacing: 4) {
                                         Image(systemName: "externaldrive.badge.plus")
-                                            .font(.system(size: 10))
+                                            .font(.system(size: 10.5, weight: .semibold))
+                                            .foregroundStyle(Color(red: 0.05, green: 0.48, blue: 0.98))
                                         Text("系统挂载")
-                                            .font(.system(size: 10, weight: .medium))
+                                            .font(.system(size: 10.5, weight: .semibold))
+                                            .foregroundStyle(Color.primary)
                                     }
-                                    .foregroundStyle(Color.secondary)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 3)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3.5)
                                     .background(Color(NSColor.controlBackgroundColor))
-                                    .cornerRadius(4)
+                                    .cornerRadius(5)
                                 }
                                 .buttonStyle(.plain)
                                 .help("使用系统原生方式装载此磁盘映像")
@@ -1268,18 +1321,25 @@ public struct CapsuleArchiveWindowView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.bottom, 56)
                 } else if session.displayedEntries.isEmpty {
-                    VStack(spacing: 10) {
+                    VStack(spacing: 12) {
                         Spacer()
-                        Image(systemName: "folder.badge.questionmark")
-                            .font(.system(size: 32))
+                        Image(systemName: session.totalIndexedCount > 0 ? "folder.badge.gearshape" : "folder.badge.questionmark")
+                            .font(.system(size: 34))
                             .foregroundStyle(Color(NSColor.tertiaryLabelColor))
-                        Text("当前目录为空")
+                        Text(session.totalIndexedCount > 0 ? "当前层级无直接条目 (共 \(session.totalIndexedCount) 个项目)" : "当前目录为空")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.secondary)
+                        if session.totalIndexedCount > 0 {
+                            Button("在完整工作区查看全部") {
+                                session.windowMode = .completeDesk
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                        }
                         Spacer()
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.bottom, 56)
+                    .padding(.bottom, 60)
                 } else {
                     // List of Entries
                     ScrollView {
@@ -1399,10 +1459,11 @@ public struct CapsuleArchiveWindowView: View {
                             }
                         }
                     }
-                    .id("capsule-entries-\(prefs.capsuleWindowAllowEditing)")
+                    .id("capsule-entries-\(session.currentArchiveURL?.path ?? "")-\(session.indexRevision)-\(session.currentDirectoryPath)-\(prefs.capsuleWindowAllowEditing)")
                     .padding(.horizontal, 14)
                     .padding(.bottom, 82) // ample clearance for floating bottom bar
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
 

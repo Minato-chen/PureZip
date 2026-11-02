@@ -3,6 +3,9 @@
 .AppleDouble
 .LSOverride
 ._*
+.Spotlight-V100
+.Trashes
+Icon?
 
 # Xcode / Swift Package Manager
 .build/
@@ -11,10 +14,42 @@ DerivedData/
 *.xcuserstate
 project.xcworkspace/xcuserdata/
 *.xcuserdatad
+*.xcscmblueprint
+*.xccheckout
 
 # Build artifacts & distribution
 dist/
+build/
 
-# Scratch & Temporary
+# SpecKit & AI Agent Tooling
+.agents/
+.specify/
+.cursor/
+.claude/
+.windsurf/
+
+# IDE & Editor Local Settings
+.vscode/
+.idea/
+
+# Code Signing & Notarization Secrets
+*.p12
+*.p8
+*.cer
+*.key
+*.mobileprovision
+*.provisionprofile
+.env
+.env.*
+secrets/
+notarization_key.json
+
+# Scratch, Temporary & Logs
 *.tmp
 *.log
+
+# Local Test Fixtures & Generated Archives
+ziptest/
+test_output/
+*.test.zip
+*.test.dmg
