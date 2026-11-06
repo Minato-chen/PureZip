@@ -3,6 +3,166 @@ import SQLite3
 
 private let SQLITE_TRANSIENT_DESTRUCTOR = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
+internal enum ArchiveEntryBinaryCoder {
+    private static let magic: UInt16 = 0xAE01
+
+    static func encode(_ entry: ArchiveEntry) -> Data {
+        var data = Data()
+        data.reserveCapacity(96)
+
+        var m = magic.littleEndian
+        data.append(Data(bytes: &m, count: 2))
+
+        let typeVal: UInt8 = switch entry.type {
+        case .file: 0
+        case .directory: 1
+        case .symbolicLink: 2
+        case .hardLink: 3
+        case .other: 4
+        }
+        data.append(typeVal)
+        data.append(entry.encrypted ? 1 : 0)
+
+        var flags: UInt8 = 0
+        if entry.modifiedAt != nil { flags |= 1 << 0 }
+        if entry.permissions != nil { flags |= 1 << 1 }
+        if entry.checksum != nil { flags |= 1 << 2 }
+        if entry.linkTarget != nil { flags |= 1 << 3 }
+        data.append(flags)
+
+        var uncomp = entry.uncompressedSize.littleEndian
+        data.append(Data(bytes: &uncomp, count: 8))
+
+        var comp = entry.compressedSize.littleEndian
+        data.append(Data(bytes: &comp, count: 8))
+
+        var dupCount = Int32(entry.duplicateRecordCount).littleEndian
+        data.append(Data(bytes: &dupCount, count: 4))
+
+        if let mod = entry.modifiedAt {
+            var interval = mod.timeIntervalSince1970
+            data.append(Data(bytes: &interval, count: 8))
+        }
+        if let perm = entry.permissions {
+            var p = perm.littleEndian
+            data.append(Data(bytes: &p, count: 2))
+        }
+        if let ck = entry.checksum {
+            var c = ck.littleEndian
+            data.append(Data(bytes: &c, count: 4))
+        }
+
+        func appendString(_ str: String) {
+            let utf8 = str.utf8
+            var len = UInt16(min(utf8.count, Int(UInt16.max))).littleEndian
+            data.append(Data(bytes: &len, count: 2))
+            data.append(contentsOf: utf8.prefix(Int(UInt16.max)))
+        }
+
+        appendString(entry.id)
+        appendString(entry.path)
+        if let target = entry.linkTarget {
+            appendString(target)
+        }
+
+        return data
+    }
+
+    static func decode(from data: Data) -> ArchiveEntry? {
+        guard data.count >= 24 else { return nil }
+
+        return data.withUnsafeBytes { raw in
+            var offset = 0
+
+            func read<T>(_ type: T.Type) -> T? {
+                guard offset + MemoryLayout<T>.size <= raw.count else { return nil }
+                let val = raw.loadUnaligned(fromByteOffset: offset, as: T.self)
+                offset += MemoryLayout<T>.size
+                return val
+            }
+
+            guard let m = read(UInt16.self), UInt16(littleEndian: m) == magic else {
+                return nil
+            }
+
+            guard let typeByte = read(UInt8.self),
+                  let encByte = read(UInt8.self),
+                  let flags = read(UInt8.self) else { return nil }
+
+            let entryType: ArchiveEntryType = switch typeByte {
+            case 1: .directory
+            case 2: .symbolicLink
+            case 3: .hardLink
+            case 4: .other
+            default: .file
+            }
+            let encrypted = encByte != 0
+
+            guard let uncompRaw = read(Int64.self),
+                  let compRaw = read(Int64.self),
+                  let dupRaw = read(Int32.self) else { return nil }
+
+            let uncomp = Int64(littleEndian: uncompRaw)
+            let comp = Int64(littleEndian: compRaw)
+            let dupCount = Int(Int32(littleEndian: dupRaw))
+
+            var modDate: Date? = nil
+            if (flags & (1 << 0)) != 0 {
+                if let interval = read(Double.self) {
+                    modDate = Date(timeIntervalSince1970: interval)
+                }
+            }
+
+            var permissions: UInt16? = nil
+            if (flags & (1 << 1)) != 0 {
+                if let p = read(UInt16.self) {
+                    permissions = UInt16(littleEndian: p)
+                }
+            }
+
+            var checksum: UInt32? = nil
+            if (flags & (1 << 2)) != 0 {
+                if let c = read(UInt32.self) {
+                    checksum = UInt32(littleEndian: c)
+                }
+            }
+
+            func readString() -> String? {
+                guard let lenRaw = read(UInt16.self) else { return nil }
+                let len = Int(UInt16(littleEndian: lenRaw))
+                guard offset + len <= raw.count else { return nil }
+                guard let base = raw.baseAddress else { return nil }
+                let strBytes = base.advanced(by: offset).assumingMemoryBound(to: UInt8.self)
+                let str = String(decoding: UnsafeBufferPointer(start: strBytes, count: len), as: UTF8.self)
+                offset += len
+                return str
+            }
+
+            guard let id = readString(),
+                  let path = readString() else { return nil }
+
+            var linkTarget: String? = nil
+            if (flags & (1 << 3)) != 0 {
+                linkTarget = readString()
+            }
+
+            return ArchiveEntry(
+                id: id,
+                path: path,
+                type: entryType,
+                uncompressedSize: uncomp,
+                compressedSize: comp,
+                modifiedAt: modDate,
+                permissions: permissions,
+                checksum: checksum,
+                encrypted: encrypted,
+                linkTarget: linkTarget,
+                duplicateRecordCount: dupCount
+            )
+        }
+    }
+}
+
 public enum EntryIndexError: Error, LocalizedError, Sendable {
     case sqliteFailure(code: Int32, message: String)
     case closed
@@ -68,8 +228,15 @@ public final class EntryIndex: @unchecked Sendable {
     deinit {
         close()
         if ownsTemporaryDatabase {
-            try? FileManager.default.removeItem(at: databaseURL)
+            Self.deleteDatabaseFiles(at: databaseURL)
         }
+    }
+
+    public static func deleteDatabaseFiles(at url: URL) {
+        let fm = FileManager.default
+        try? fm.removeItem(at: url)
+        try? fm.removeItem(at: URL(fileURLWithPath: url.path + "-wal"))
+        try? fm.removeItem(at: URL(fileURLWithPath: url.path + "-shm"))
     }
 
     private func createSchema() throws {
@@ -105,6 +272,7 @@ public final class EntryIndex: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         if let db = database {
+            sqlite3_exec(db, "PRAGMA wal_checkpoint(TRUNCATE);", nil, nil, nil)
             sqlite3_close_v2(db)
             database = nil
         }
@@ -255,7 +423,7 @@ public final class EntryIndex: @unchecked Sendable {
                 let canonicalPath = ArchiveBrowserProjection.canonicalDirectoryPath(entry.path)
                 guard !canonicalPath.isEmpty else { continue }
 
-                let payloadData = try encoder.encode(entry)
+                let payloadData = ArchiveEntryBinaryCoder.encode(entry)
                 let auxInt: Int32 = entry.isAuxiliary ? 1 : 0
                 let bgInt: Int32 = entry.isDiskImageBackground ? 1 : 0
                 let dmgShortInt: Int32 = entry.isDMGApplicationsShortcut ? 1 : 0
@@ -287,7 +455,7 @@ public final class EntryIndex: @unchecked Sendable {
                                 path: ancestorPath,
                                 type: .directory
                             )
-                            let virtualPayload = try encoder.encode(virtualEntry)
+                            let virtualPayload = ArchiveEntryBinaryCoder.encode(virtualEntry)
                             sqlite3_reset(nodeStmt)
                             sqlite3_clear_bindings(nodeStmt)
                             bindText(nodeStmt, index: 1, value: ancestorPath)
@@ -643,8 +811,12 @@ public final class EntryIndex: @unchecked Sendable {
             let byteCount = Int(sqlite3_column_bytes(stmt, 0))
             if byteCount > 0, let rawPtr = sqlite3_column_blob(stmt, 0) {
                 let data = Data(bytes: rawPtr, count: byteCount)
-                let entry = try decoder.decode(ArchiveEntry.self, from: data)
-                results.append(entry)
+                if let fastEntry = ArchiveEntryBinaryCoder.decode(from: data) {
+                    results.append(fastEntry)
+                } else {
+                    let entry = try decoder.decode(ArchiveEntry.self, from: data)
+                    results.append(entry)
+                }
             }
         }
         return results

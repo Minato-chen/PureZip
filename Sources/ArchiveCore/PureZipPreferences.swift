@@ -530,6 +530,24 @@ public final class PureZipPreferences: ObservableObject {
         var totalBytes: Int64 = 0
         let fm = FileManager.default
 
+        let dedicatedDirs = [
+            fm.temporaryDirectory.appendingPathComponent("com.minato.purezip.indexes"),
+            fm.temporaryDirectory.appendingPathComponent("com.minato.purezip.ledger"),
+            fm.temporaryDirectory.appendingPathComponent("com.minato.purezip.workfiles"),
+            fm.temporaryDirectory.appendingPathComponent("com.minato.purezip.finder-requests"),
+            fm.temporaryDirectory.appendingPathComponent("com.minato.purezip.previews"),
+            fm.temporaryDirectory.appendingPathComponent("PureZipSharedPreviewMedia")
+        ]
+
+        for dir in dedicatedDirs {
+            guard let enumerator = fm.enumerator(at: dir, includingPropertiesForKeys: [.fileSizeKey]) else { continue }
+            while let fileURL = enumerator.nextObject() as? URL {
+                if let size = (try? fileURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize {
+                    totalBytes += Int64(size)
+                }
+            }
+        }
+
         let candidateDirs = [
             NSTemporaryDirectory(),
             (NSTemporaryDirectory() as NSString).appendingPathComponent("purezip"),
@@ -537,13 +555,13 @@ public final class PureZipPreferences: ObservableObject {
             FileManager.default.temporaryDirectory.path
         ]
 
-        let searchTokens = ["extract", "lease", "PureZip", "PureZip", "purezip", "Stage", "DMG"]
+        let searchTokens = ["extract", "lease", "PureZip", "purezip", "Stage", "DMG"]
 
         for dir in candidateDirs {
             guard fm.fileExists(atPath: dir) else { continue }
             if let items = try? fm.contentsOfDirectory(atPath: dir) {
                 for item in items {
-                    if searchTokens.contains(where: { item.contains($0) }) {
+                    if searchTokens.contains(where: { item.localizedCaseInsensitiveContains($0) }) {
                         let full = (dir as NSString).appendingPathComponent(item)
                         if let attrs = try? fm.attributesOfItem(atPath: full),
                            let size = attrs[.size] as? Int64 {
@@ -563,8 +581,26 @@ public final class PureZipPreferences: ObservableObject {
         }
     }
 
-    public func cleanTemporaryFiles() {
+    public nonisolated static func performDiskCleanup() {
         let fm = FileManager.default
+
+        let dedicatedDirs = [
+            fm.temporaryDirectory.appendingPathComponent("com.minato.purezip.indexes"),
+            fm.temporaryDirectory.appendingPathComponent("com.minato.purezip.ledger"),
+            fm.temporaryDirectory.appendingPathComponent("com.minato.purezip.workfiles"),
+            fm.temporaryDirectory.appendingPathComponent("com.minato.purezip.finder-requests"),
+            fm.temporaryDirectory.appendingPathComponent("com.minato.purezip.previews"),
+            fm.temporaryDirectory.appendingPathComponent("PureZipSharedPreviewMedia")
+        ]
+
+        for dir in dedicatedDirs {
+            if let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) {
+                for item in items {
+                    try? fm.removeItem(at: item)
+                }
+            }
+        }
+
         let candidateDirs = [
             NSTemporaryDirectory(),
             (NSTemporaryDirectory() as NSString).appendingPathComponent("purezip"),
@@ -572,19 +608,23 @@ public final class PureZipPreferences: ObservableObject {
             FileManager.default.temporaryDirectory.path
         ]
 
-        let searchTokens = ["extract", "lease", "PureZip", "PureZip", "purezip", "Stage", "DMG"]
+        let searchTokens = ["extract", "lease", "PureZip", "purezip", "Stage", "DMG"]
 
         for dir in candidateDirs {
             guard fm.fileExists(atPath: dir) else { continue }
             if let items = try? fm.contentsOfDirectory(atPath: dir) {
                 for item in items {
-                    if searchTokens.contains(where: { item.contains($0) }) {
+                    if searchTokens.contains(where: { item.localizedCaseInsensitiveContains($0) }) {
                         let full = (dir as NSString).appendingPathComponent(item)
                         try? fm.removeItem(atPath: full)
                     }
                 }
             }
         }
+    }
+
+    public func cleanTemporaryFiles() {
+        Self.performDiskCleanup()
         tempFileSizeString = "0 KB"
     }
 

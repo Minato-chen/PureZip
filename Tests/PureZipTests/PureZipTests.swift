@@ -45,6 +45,8 @@ public enum PureZipSelfTestSuite {
         try testImagePreviewHelperAndDownsampling(tempDir: tempDir)
         try await testZIPEngineTailSeekAndBrokerRouting(tempDir: tempDir)
         try await testSevenZipUnicodeNFDNormalizationAndExtraction(tempDir: tempDir)
+        try testSymlinkTraversalMitigation(tempDir: tempDir)
+        try testArchiveEntryBinaryCoderRoundTrip()
     }
 
     public static func testVolumeAndOutputFamilies(tempDir: URL) throws {
@@ -527,5 +529,121 @@ public enum PureZipSelfTestSuite {
             }
         }
         try assertTrue(existsDirect || foundRecursive, "Expected IMG_0578.jpg to be extracted by 7zz with Unicode normalization")
+    }
+
+    public static func testSymlinkTraversalMitigation(tempDir: URL) throws {
+        let fm = FileManager.default
+        let safeDest = tempDir.appendingPathComponent("SafeExtract", isDirectory: true)
+        let outsideDir = tempDir.appendingPathComponent("OutsideSecret", isDirectory: true)
+        try fm.createDirectory(at: safeDest, withIntermediateDirectories: true)
+        try fm.createDirectory(at: outsideDir, withIntermediateDirectories: true)
+
+        // 1. Normal path succeeds
+        let validURL = try ZIPEngine.validatedDestinationURL(for: "sub/test.txt", inside: safeDest)
+        try assertTrue(validURL.path.hasPrefix(safeDest.path))
+
+        // 2. Relative traversal throws unsafePath
+        var threwDotDot = false
+        do {
+            _ = try ZIPEngine.validatedDestinationURL(for: "../secret.txt", inside: safeDest)
+        } catch ArchiveEngineError.unsafePath {
+            threwDotDot = true
+        }
+        try assertTrue(threwDotDot, "Expected ../ traversal to throw unsafePath")
+
+        // 3. Absolute path is safely sanitized to remain inside destination
+        let absURL = try ZIPEngine.validatedDestinationURL(for: "/etc/passwd", inside: safeDest)
+        try assertTrue(absURL.path.hasPrefix(safeDest.path), "Absolute path must be sanitized to stay inside destination")
+        try assertTrue(absURL.path != "/etc/passwd", "Absolute path must not point to root filesystem")
+
+        // 4. Pre-existing symlink in directory pointing outside destination throws unsafePath
+        let symlinkFolder = safeDest.appendingPathComponent("evil_symlink")
+        try fm.createSymbolicLink(at: symlinkFolder, withDestinationURL: outsideDir)
+
+        var threwSymlinkTraversal = false
+        do {
+            _ = try ZIPEngine.validatedDestinationURL(for: "evil_symlink/target.txt", inside: safeDest)
+        } catch ArchiveEngineError.unsafePath {
+            threwSymlinkTraversal = true
+        }
+        try assertTrue(threwSymlinkTraversal, "Expected existing symlink pointing outside destination to throw unsafePath")
+    }
+
+    public static func testArchiveEntryBinaryCoderRoundTrip() throws {
+        let date = Date(timeIntervalSince1970: 1710000000)
+        let sampleEntries: [ArchiveEntry] = [
+            ArchiveEntry(
+                id: "test-1",
+                path: "Folder/File1.txt",
+                type: .file,
+                uncompressedSize: 1048576,
+                compressedSize: 524288,
+                modifiedAt: date,
+                permissions: 0o644,
+                checksum: 0xDEADBEEF,
+                encrypted: false,
+                linkTarget: nil,
+                duplicateRecordCount: 0
+            ),
+            ArchiveEntry(
+                id: "symlink-2",
+                path: "Links/toTarget",
+                type: .symbolicLink,
+                uncompressedSize: 0,
+                compressedSize: 0,
+                modifiedAt: nil,
+                permissions: nil,
+                checksum: nil,
+                encrypted: true,
+                linkTarget: "../Other/file.txt",
+                duplicateRecordCount: 2
+            ),
+            ArchiveEntry(
+                id: "cjk-3",
+                path: "文档目录/财务报表_2026.xlsx",
+                type: .file,
+                uncompressedSize: 8589934592, // > 4GB
+                compressedSize: 4294967296,
+                modifiedAt: date,
+                permissions: 0o755,
+                checksum: 0x12345678,
+                encrypted: false,
+                linkTarget: nil,
+                duplicateRecordCount: 1
+            ),
+            ArchiveEntry(
+                id: "dir-4",
+                path: "EmptyDir",
+                type: .directory,
+                uncompressedSize: 0,
+                compressedSize: 0,
+                modifiedAt: nil,
+                permissions: nil,
+                checksum: nil,
+                encrypted: false,
+                linkTarget: nil,
+                duplicateRecordCount: 0
+            )
+        ]
+
+        for entry in sampleEntries {
+            let encoded = ArchiveEntryBinaryCoder.encode(entry)
+            guard let decoded = ArchiveEntryBinaryCoder.decode(from: encoded) else {
+                throw NSError(domain: "PureZipTests", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to decode entry: \(entry.path)"])
+            }
+            try assertEqual(decoded.id, entry.id)
+            try assertEqual(decoded.path, entry.path)
+            try assertEqual(decoded.type, entry.type)
+            try assertEqual(decoded.uncompressedSize, entry.uncompressedSize)
+            try assertEqual(decoded.compressedSize, entry.compressedSize)
+            try assertEqual(decoded.encrypted, entry.encrypted)
+            try assertEqual(decoded.permissions, entry.permissions)
+            try assertEqual(decoded.checksum, entry.checksum)
+            try assertEqual(decoded.linkTarget, entry.linkTarget)
+            try assertEqual(decoded.duplicateRecordCount, entry.duplicateRecordCount)
+            if let origDate = entry.modifiedAt, let decDate = decoded.modifiedAt {
+                try assertTrue(abs(origDate.timeIntervalSince1970 - decDate.timeIntervalSince1970) < 0.001)
+            }
+        }
     }
 }

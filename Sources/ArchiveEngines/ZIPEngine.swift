@@ -171,6 +171,13 @@ public struct ZIPEngine: ArchiveEngine {
             }
 
             try fm.createDirectory(at: targetURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let parentResolved = targetURL.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL
+            let destResolved = destination.resolvingSymlinksInPath().standardizedFileURL
+            let destResolvedPrefix = destResolved.path.hasSuffix("/") ? destResolved.path : destResolved.path + "/"
+            guard parentResolved.path == destResolved.path || parentResolved.path.hasPrefix(destResolvedPrefix) else {
+                throw ArchiveEngineError.unsafePath("Parent directory escapes destination via symlink: \(rec.entry.path)")
+            }
+
             let payload = try Self.extractRecordPayload(rec, from: handle)
 
             if rec.entry.type == .symbolicLink {
@@ -184,6 +191,12 @@ public struct ZIPEngine: ArchiveEngine {
                 }
                 try fm.createSymbolicLink(atPath: targetURL.path, withDestinationPath: linkTarget)
             } else {
+                if fm.fileExists(atPath: targetURL.path) {
+                    var isDir: ObjCBool = false
+                    if fm.fileExists(atPath: targetURL.path, isDirectory: &isDir), !isDir.boolValue {
+                        try? fm.removeItem(at: targetURL)
+                    }
+                }
                 try payload.write(to: targetURL, options: .atomic)
                 if let perms = rec.entry.permissions {
                     try? fm.setAttributes([.posixPermissions: NSNumber(value: perms)], ofItemAtPath: targetURL.path)
@@ -683,10 +696,22 @@ public enum NativeStreamingZIPWriter {
         progress: (@Sendable (ArchiveTaskProgress) -> Void)?
     ) throws {
         let items = try collectSourceItems(sources: sources, preserveMacMetadata: profile.preserveMacMetadata)
+        guard items.count <= 65535 else {
+            throw ArchiveEngineError.engineFailure(
+                backend: "ZIPEngine",
+                detail: "Native standard ZIP writer supports up to 65,535 items (got \(items.count)). Use 7-Zip engine for Zip64 archives."
+            )
+        }
         let totalSourceBytes: Int64 = items.reduce(0) { sum, item in
             guard !item.isDirectory else { return sum }
             let sz = (try? item.url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
             return sum + Int64(sz)
+        }
+        guard totalSourceBytes <= Int64(UInt32.max) else {
+            throw ArchiveEngineError.engineFailure(
+                backend: "ZIPEngine",
+                detail: "Native standard ZIP writer supports archives up to 4GB. Use 7-Zip engine for large Zip64 archives."
+            )
         }
 
         var archiveBuffer = Data()

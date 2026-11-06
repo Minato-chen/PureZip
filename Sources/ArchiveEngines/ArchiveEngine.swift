@@ -98,6 +98,25 @@ extension ArchiveEngine {
         guard target.path == rootPath || target.path.hasPrefix(rootPrefix) else {
             throw ArchiveEngineError.unsafePath(entryPath)
         }
+
+        // Canonical symlink-resolution defense:
+        // Ensure that any existing path component on disk does not resolve outside destination.
+        let resolvedDest = destination.resolvingSymlinksInPath().standardizedFileURL
+        let resolvedPrefix = resolvedDest.path.hasSuffix("/") ? resolvedDest.path : resolvedDest.path + "/"
+        var checkURL = target
+        while checkURL.path.count >= destination.path.count {
+            if FileManager.default.fileExists(atPath: checkURL.path) {
+                let resolved = checkURL.resolvingSymlinksInPath().standardizedFileURL
+                guard resolved.path == resolvedDest.path || resolved.path.hasPrefix(resolvedPrefix) else {
+                    throw ArchiveEngineError.unsafePath("Symlink traversal detected: \(entryPath)")
+                }
+                break
+            }
+            let parent = checkURL.deletingLastPathComponent()
+            if parent.path == checkURL.path { break }
+            checkURL = parent
+        }
+
         return target
     }
 }

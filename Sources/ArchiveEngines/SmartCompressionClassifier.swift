@@ -74,12 +74,15 @@ public enum SmartCompressionClassifier {
         }
 
         // 4. Magic signature & sample chunk probe
-        guard let handle = try? FileHandle(forReadingFrom: url),
-              let sample = try? handle.read(upToCount: initialProbeChunkBytes),
+        guard let handle = try? FileHandle(forReadingFrom: url) else {
+            return FileDecision(url: url, size: size, intent: .compress, evidence: .sampled, estimatedRatio: 0.8)
+        }
+        defer { try? handle.close() }
+
+        guard let sample = try? handle.read(upToCount: initialProbeChunkBytes),
               !sample.isEmpty else {
             return FileDecision(url: url, size: size, intent: .compress, evidence: .sampled, estimatedRatio: 0.8)
         }
-        try? handle.close()
 
         let bytes = [UInt8](sample)
         // Check known compressed binary magic signatures (PNG, JPEG, ZIP, 7z, Gzip, Zstd)

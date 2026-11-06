@@ -2256,48 +2256,112 @@ public struct SettingsView: View {
                             .cornerRadius(6)
                     }
 
-                    HStack(spacing: 12) {
-                        Button {
-                            if let url = release.downloadURL {
-                                NSWorkspace.shared.open(url)
-                            } else {
-                                NSWorkspace.shared.open(release.htmlURL)
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "arrow.down.circle.fill")
-                                Text("立即前往下载")
-                            }
-                            .font(.system(size: 12, weight: .semibold))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 7)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color(red: 0.05, green: 0.48, blue: 0.98), Color(red: 0.02, green: 0.36, blue: 0.85)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .clipShape(Capsule())
-                            .foregroundStyle(.white)
-                        }
-                        .buttonStyle(.plain)
+                    if model.updateManager.isDownloading {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text(model.updateManager.updatePhaseText.isEmpty ? "正在下载更新包..." : model.updateManager.updatePhaseText)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(.primary)
 
-                        Button {
-                            NSWorkspace.shared.open(release.htmlURL)
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "doc.text")
-                                Text("查看发布说明")
+                                Spacer()
+
+                                if model.updateManager.downloadSpeedMBs > 0.05 {
+                                    Text(String(format: "%.1f MB/s", model.updateManager.downloadSpeedMBs))
+                                        .font(.system(size: 12, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                }
                             }
-                            .font(.system(size: 12, weight: .medium))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 7)
-                            .background(colorScheme == .dark ? Color(white: 0.20) : Color(white: 0.92))
-                            .clipShape(Capsule())
-                            .foregroundStyle(.primary)
+
+                            ProgressView(value: model.updateManager.downloadProgress, total: 1.0)
+                                .progressViewStyle(.linear)
+
+                            HStack {
+                                Text(String(format: "已完成 %.0f%%", model.updateManager.downloadProgress * 100))
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+
+                                Spacer()
+
+                                Button("取消更新") {
+                                    model.updateManager.cancelDownload()
+                                }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Color.red)
+                            }
                         }
-                        .buttonStyle(.plain)
+                        .padding(10)
+                        .background(colorScheme == .dark ? Color(white: 0.12) : Color(white: 0.94))
+                        .cornerRadius(8)
+                    } else {
+                        HStack(spacing: 12) {
+                            Button {
+                                model.updateManager.startInAppUpdate(release: release)
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+                                    Text("立即在应用内更新")
+                                }
+                                .font(.system(size: 12, weight: .semibold))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 7)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color(red: 0.05, green: 0.48, blue: 0.98), Color(red: 0.02, green: 0.36, blue: 0.85)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .clipShape(Capsule())
+                                .foregroundStyle(.white)
+                            }
+                            .buttonStyle(.plain)
+
+                            Button {
+                                NSWorkspace.shared.open(release.htmlURL)
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "doc.text")
+                                    Text("发布说明")
+                                }
+                                .font(.system(size: 12, weight: .medium))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(colorScheme == .dark ? Color(white: 0.20) : Color(white: 0.92))
+                                .clipShape(Capsule())
+                                .foregroundStyle(.primary)
+                            }
+                            .buttonStyle(.plain)
+
+                            Button {
+                                if let url = release.downloadURL {
+                                    NSWorkspace.shared.open(url)
+                                } else {
+                                    NSWorkspace.shared.open(release.htmlURL)
+                                }
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "safari")
+                                    Text("网页下载")
+                                }
+                                .font(.system(size: 12))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        if let errMsg = model.updateManager.updateErrorMessage {
+                            HStack(spacing: 6) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.red)
+                                    .font(.system(size: 12))
+                                Text(errMsg)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.red)
+                            }
+                        }
                     }
                 }
                 .padding(16)
@@ -2330,19 +2394,27 @@ public struct SettingsView: View {
                             .foregroundStyle(.secondary)
 
                         HStack(spacing: 6) {
-                            if model.isCheckingUpdates {
+                            if model.updateManager.isDownloading {
                                 ProgressView()
                                     .controlSize(.mini)
-                            } else if model.updateManager.hasNewVersion {
-                                Circle().fill(Color.orange).frame(width: 7, height: 7)
-                            } else if model.updateManager.checkError != nil {
-                                Circle().fill(Color.red).frame(width: 7, height: 7)
-                            } else if model.updateStatusText.contains("已是最新版本") {
-                                Circle().fill(Color.green).frame(width: 7, height: 7)
+                                Text(model.updateManager.updatePhaseText)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                if model.isCheckingUpdates {
+                                    ProgressView()
+                                        .controlSize(.mini)
+                                } else if model.updateManager.hasNewVersion {
+                                    Circle().fill(Color.orange).frame(width: 7, height: 7)
+                                } else if model.updateManager.checkError != nil {
+                                    Circle().fill(Color.red).frame(width: 7, height: 7)
+                                } else if model.updateStatusText.contains("已是最新版本") {
+                                    Circle().fill(Color.green).frame(width: 7, height: 7)
+                                }
+                                Text(model.updateStatusText)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
                             }
-                            Text(model.updateStatusText)
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
                         }
                     }
 

@@ -96,6 +96,11 @@ public final class PureZipApplicationDelegate: NSObject, NSApplicationDelegate {
 
         // Auto-register Finder extension and LaunchServices in background for dev/local testing
         registerSystemIntegrationIfNeeded()
+
+        // Prune any stale temporary/preview files left from prior runs
+        Task.detached(priority: .utility) {
+            PureZipPreferences.performDiskCleanup()
+        }
     }
 
     /// Explicitly binds `NSApp.applicationIconImage` from `AppIcon.icns` so Dock/Switcher icons are guaranteed even in debug/CLI launches

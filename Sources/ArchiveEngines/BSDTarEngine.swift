@@ -113,16 +113,21 @@ public struct BSDTarEngine: ArchiveEngine {
 
     public func list(_ url: URL, password: String? = nil) -> AsyncThrowingStream<[ArchiveEntry], Error> {
         AsyncThrowingStream { continuation in
-            do {
-                let output = try SevenZipEngine.runProcess(
-                    executable: executableURL,
-                    arguments: ["-tvf", url.path]
-                )
-                let entries = CatalogReader.parse(verboseOutput: output)
-                continuation.yield(entries)
-                continuation.finish()
-            } catch {
-                continuation.finish(throwing: error)
+            let task = Task.detached(priority: .userInitiated) {
+                do {
+                    let output = try SevenZipEngine.runProcess(
+                        executable: executableURL,
+                        arguments: ["-tvf", url.path]
+                    )
+                    let entries = CatalogReader.parse(verboseOutput: output)
+                    continuation.yield(entries)
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
             }
         }
     }

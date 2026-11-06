@@ -30,16 +30,21 @@ public final class PreviewArtifactCache {
 
     public init() {
         imageCache.countLimit = 120
+        imageCache.totalCostLimit = 80 * 1024 * 1024 // 80 MB max RAM for images
         pdfPagesCache.countLimit = 30
         textCache.countLimit = 200
         dimensionsCache.countLimit = 500
+        sweepDiskCache()
     }
 
     public func image(for key: String) -> NSImage? {
         imageCache.object(forKey: key as NSString)
     }
     public func setImage(_ image: NSImage, for key: String) {
-        imageCache.setObject(image, forKey: key as NSString)
+        let pixelWidth = image.representations.first?.pixelsWide ?? Int(image.size.width)
+        let pixelHeight = image.representations.first?.pixelsHigh ?? Int(image.size.height)
+        let cost = max(1024, min(16 * 1024 * 1024, pixelWidth * pixelHeight * 4))
+        imageCache.setObject(image, forKey: key as NSString, cost: cost)
     }
 
     public func pdfPages(for key: String) -> [NSImage]? {
@@ -116,6 +121,8 @@ public final class PreviewArtifactCache {
 
     // Shared disk cache for extracted media/document preview files so Hover, Inspector, and Spacebar QuickLook
     // share a single extraction instead of re-extracting large video/audio files multiple times.
+    public static let maxPreviewDiskBytes: Int64 = 150 * 1024 * 1024 // 150 MB
+    public static let targetPreviewDiskBytes: Int64 = 80 * 1024 * 1024 // 80 MB
     private let fileCacheLock = NSLock()
     private var extractedFileCache: [String: URL] = [:]
     private var extractedFileOrder: [String] = []
@@ -126,6 +133,58 @@ public final class PreviewArtifactCache {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }()
+
+    public func sweepDiskCache(maxAgeHours: Double = 12) {
+        fileCacheLock.lock()
+        defer { fileCacheLock.unlock() }
+
+        let fm = FileManager.default
+        guard let items = try? fm.contentsOfDirectory(
+            at: previewMediaCacheDir,
+            includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey],
+            options: .skipsHiddenFiles
+        ) else { return }
+
+        let now = Date()
+        let cutoffDate = now.addingTimeInterval(-maxAgeHours * 3600)
+        var totalBytes: Int64 = 0
+        var fileMetaList: [(url: URL, size: Int64, date: Date)] = []
+
+        for item in items {
+            let res = try? item.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+            let size = Int64(res?.fileSize ?? 0)
+            let date = res?.contentModificationDate ?? .distantPast
+
+            if date < cutoffDate {
+                try? fm.removeItem(at: item)
+                continue
+            }
+            totalBytes += size
+            fileMetaList.append((url: item, size: size, date: date))
+        }
+
+        if totalBytes > Self.maxPreviewDiskBytes {
+            fileMetaList.sort { $0.date < $1.date }
+            for entry in fileMetaList {
+                if totalBytes <= Self.targetPreviewDiskBytes { break }
+                try? fm.removeItem(at: entry.url)
+                totalBytes -= entry.size
+            }
+        }
+    }
+
+    public func purgeAllDiskCache() {
+        fileCacheLock.lock()
+        defer { fileCacheLock.unlock() }
+        extractedFileCache.removeAll()
+        extractedFileOrder.removeAll()
+        let fm = FileManager.default
+        if let items = try? fm.contentsOfDirectory(at: previewMediaCacheDir, includingPropertiesForKeys: nil) {
+            for item in items {
+                try? fm.removeItem(at: item)
+            }
+        }
+    }
 
     public func cachedExtractedFile(for key: String) -> URL? {
         fileCacheLock.lock()
@@ -175,6 +234,9 @@ public final class PreviewArtifactCache {
             if let oldURL = extractedFileCache.removeValue(forKey: oldestKey) {
                 try? fm.removeItem(at: oldURL)
             }
+        }
+        Task.detached(priority: .utility) { [weak self] in
+            self?.sweepDiskCache()
         }
         return destURL
     }

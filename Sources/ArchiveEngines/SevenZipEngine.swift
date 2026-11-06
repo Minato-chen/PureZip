@@ -225,25 +225,30 @@ public struct SevenZipEngine: ArchiveEngine {
 
     public func list(_ url: URL, password: String? = nil) -> AsyncThrowingStream<[ArchiveEntry], Error> {
         AsyncThrowingStream { continuation in
-            do {
-                guard let bin = executableURL else {
-                    throw ArchiveEngineError.engineFailure(backend: id, detail: "7zz binary not found")
-                }
-                let primary = ArchiveVolumeFamily.primaryURL(for: url)
-                var args = ["l", "-slt"]
-                if let pw = password, !pw.isEmpty {
-                    args.append("-p\(pw)")
-                } else {
-                    args.append("-p")
-                }
-                args.append(primary.path)
+            let task = Task.detached(priority: .userInitiated) {
+                do {
+                    guard let bin = executableURL else {
+                        throw ArchiveEngineError.engineFailure(backend: id, detail: "7zz binary not found")
+                    }
+                    let primary = ArchiveVolumeFamily.primaryURL(for: url)
+                    var args = ["l", "-slt"]
+                    if let pw = password, !pw.isEmpty {
+                        args.append("-p\(pw)")
+                    } else {
+                        args.append("-p")
+                    }
+                    args.append(primary.path)
 
-                let output = try Self.runProcess(executable: bin, arguments: args)
-                let parsed = CatalogReader.parse(sltOutput: output, archiveRootName: primary.lastPathComponent)
-                continuation.yield(parsed.entries)
-                continuation.finish()
-            } catch {
-                continuation.finish(throwing: error)
+                    let output = try Self.runProcess(executable: bin, arguments: args)
+                    let parsed = CatalogReader.parse(sltOutput: output, archiveRootName: primary.lastPathComponent)
+                    continuation.yield(parsed.entries)
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
             }
         }
     }
@@ -427,7 +432,7 @@ public struct SevenZipEngine: ArchiveEngine {
         var outData = Data()
         var errData = Data()
         let currentQoS = DispatchQoS.QoSClass(rawValue: qos_class_self()) ?? .userInitiated
-        let targetQoS: DispatchQoS.QoSClass = (currentQoS == .unspecified || currentQoS == .background || currentQoS == .utility) ? .userInitiated : currentQoS
+        let targetQoS: DispatchQoS.QoSClass = (currentQoS == .userInteractive) ? .userInteractive : ((currentQoS == .unspecified || currentQoS == .background || currentQoS == .utility) ? .userInitiated : currentQoS)
         let queue = DispatchQueue.global(qos: targetQoS)
         let group = DispatchGroup()
         group.enter()
@@ -479,7 +484,7 @@ public struct SevenZipEngine: ArchiveEngine {
         proc.standardError = errPipe
 
         let currentQoS = DispatchQoS.QoSClass(rawValue: qos_class_self()) ?? .userInitiated
-        let targetQoS: DispatchQoS.QoSClass = (currentQoS == .unspecified || currentQoS == .background || currentQoS == .utility) ? .userInitiated : currentQoS
+        let targetQoS: DispatchQoS.QoSClass = (currentQoS == .userInteractive) ? .userInteractive : ((currentQoS == .unspecified || currentQoS == .background || currentQoS == .utility) ? .userInitiated : currentQoS)
         let queue = DispatchQueue.global(qos: targetQoS)
 
         return try await withTaskCancellationHandler {

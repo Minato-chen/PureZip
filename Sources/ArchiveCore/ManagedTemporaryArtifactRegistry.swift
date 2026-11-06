@@ -461,6 +461,14 @@ public actor ManagedTemporaryArtifactRegistry {
             sqlite3_bind_blob(stmt, index, rawBuffer.baseAddress, Int32(data.count), SQLITE_TRANSIENT_DESTRUCTOR_REG)
         }
     }
+
+    deinit {
+        if let db = databaseHandle {
+            sqlite3_exec(db, "PRAGMA wal_checkpoint(TRUNCATE);", nil, nil, nil)
+            sqlite3_close_v2(db)
+        }
+        EntryIndex.deleteDatabaseFiles(at: databaseURL)
+    }
 }
 
 // MARK: - ManagedWorkFileStore & ManagedWorkFileLease

@@ -67,6 +67,7 @@ struct PureZipCLI {
                 }
 
                 let index = try EntryIndex()
+                defer { index.close() }
                 let stream = try await broker.list(url)
                 for try await batch in stream {
                     try index.insert(batch)

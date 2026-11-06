@@ -3169,10 +3169,12 @@ public struct MenuBarShelfView: View {
             group.enter()
             if p.canLoadObject(ofClass: URL.self) {
                 _ = p.loadObject(ofClass: URL.self) { url, _ in
-                    if let url = url {
-                        DispatchQueue.main.async { urls.append(url) }
+                    DispatchQueue.main.async {
+                        if let url = url {
+                            urls.append(url)
+                        }
+                        group.leave()
                     }
-                    group.leave()
                 }
             } else {
                 p.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
@@ -3181,10 +3183,12 @@ public struct MenuBarShelfView: View {
                     else if let d = item as? Data { res = URL(dataRepresentation: d, relativeTo: nil) }
                     else if let s = item as? String { res = URL(string: s)?.isFileURL == true ? URL(string: s) : URL(fileURLWithPath: s) }
                     else { res = nil }
-                    if let res {
-                        DispatchQueue.main.async { urls.append(res) }
+                    DispatchQueue.main.async {
+                        if let res {
+                            urls.append(res)
+                        }
+                        group.leave()
                     }
-                    group.leave()
                 }
             }
         }

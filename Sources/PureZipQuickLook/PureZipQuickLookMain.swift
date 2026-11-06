@@ -73,9 +73,13 @@ public final class PreviewViewController: NSViewController, QLPreviewingControll
                 defer { index.close() }
 
                 var allEntries: [ArchiveEntry] = []
+                let maxSeedEntries = ArchivePreviewSeedStore.maximumEntryCount
                 let stream = try await broker.list(url)
                 for try await batch in stream {
-                    allEntries.append(contentsOf: batch)
+                    if allEntries.count < maxSeedEntries {
+                        let remaining = maxSeedEntries - allEntries.count
+                        allEntries.append(contentsOf: batch.prefix(remaining))
+                    }
                     try index.insert(batch)
                 }
 

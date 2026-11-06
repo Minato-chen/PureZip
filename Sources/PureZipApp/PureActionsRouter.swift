@@ -49,6 +49,7 @@ public struct PureActionDescriptor: Identifiable, Sendable {
 /// Dynamic contextual action resolver and executor for Pure Actions.
 @MainActor
 public final class PureActionsRouter {
+    private static var inFlightPackageLeases: [UUID: ManagedWorkFileLease] = [:]
 
     public static func isFormatAllowedInPureActions(_ ext: String) -> Bool {
         guard let tag = pureActionsFormatTag(for: ext) else { return true }
@@ -328,6 +329,11 @@ public final class PureActionsRouter {
             let pkgURL = stageLease.url.appendingPathComponent(entry.path)
             guard FileManager.default.fileExists(atPath: pkgURL.path) else {
                 throw ArchiveEngineError.io("未能提取安装包: \(entry.name)")
+            }
+            // Retain the staging lease for 180 seconds so macOS Installer has ample time to load the package
+            inFlightPackageLeases[stageLease.id] = stageLease
+            DispatchQueue.main.asyncAfter(deadline: .now() + 180) {
+                inFlightPackageLeases.removeValue(forKey: stageLease.id)
             }
             NSWorkspace.shared.open(pkgURL)
             return "已启动系统安装器处理 \"\(entry.name)\""

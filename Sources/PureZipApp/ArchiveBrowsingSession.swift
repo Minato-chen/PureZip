@@ -1020,14 +1020,14 @@ public final class ArchiveBrowsingSession: ObservableObject {
             )
             return
         }
-        // Cap live preview extraction: Media up to 2 GiB (with fast low-res frame & audio sampling), Nested Archives up to 500 MiB, Images/RAW up to 200 MiB, documents/text up to 15 MiB
+        // Cap live preview extraction: Media up to 300 MiB (with fast keyframes & audio sampling), Nested Archives up to 500 MiB, Images/RAW up to 200 MiB, documents/text up to 15 MiB
         let ext = (entry.name as NSString).pathExtension.lowercased()
         let isMedia = MediaPreviewExtractor.isAudio(ext: ext) || MediaPreviewExtractor.isVideo(ext: ext)
         let isNested = entry.isNestedArchive
         let isImage = ImagePreviewHelper.isSupportedImage(ext: ext)
         let maxLimit: Int64
         if isMedia {
-            maxLimit = 2 * 1024 * 1024 * 1024
+            maxLimit = 300 * 1024 * 1024
         } else if isNested {
             maxLimit = 500 * 1024 * 1024
         } else if isImage {
@@ -1133,7 +1133,11 @@ public final class ArchiveBrowsingSession: ObservableObject {
                 )
                 PreviewArtifactCache.shared.setNestedArchiveSummary(summary, for: cacheKey)
                 let decision = SmartCompressionClassifier.classify(fileAt: extractedURL, compressionLevel: 6)
-                let headerData = (try? FileHandle(forReadingFrom: extractedURL))?.readData(ofLength: 256) ?? Data()
+                let headerData: Data = {
+                    guard let fh = try? FileHandle(forReadingFrom: extractedURL) else { return Data() }
+                    defer { try? fh.close() }
+                    return fh.readData(ofLength: 256)
+                }()
                 let hex = headerData.map { String(format: "%02X", $0) }.joined(separator: " ")
 
                 guard !Task.isCancelled, selectedEntryID == entry.id else { return }
@@ -2353,7 +2357,7 @@ public final class ArchiveBrowsingSession: ObservableObject {
 
             try Data("""
             public struct DemoEngine {
-                public static let version = "1.1.0"
+                public static let version = "1.1.1"
             }
             """.utf8).write(to: srcDir.appendingPathComponent("DemoEngine.swift"))
 
