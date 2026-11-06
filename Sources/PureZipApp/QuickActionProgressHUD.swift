@@ -11,6 +11,7 @@ public final class QuickActionProgressHUD: ObservableObject {
     @Published public var progress: Double = 0.0
     @Published public var isIndeterminate: Bool = true
     @Published public var isCompleted: Bool = false
+    @Published public var isFailed: Bool = false
     @Published public var systemSymbol: String = "archivebox"
 
     private var panel: NSPanel?
@@ -56,14 +57,11 @@ public final class QuickActionProgressHUD: ObservableObject {
         self.progress = 0.0
         self.isIndeterminate = true
         self.isCompleted = false
+        self.isFailed = false
         self.systemSymbol = symbol
         self.onCancel = cancelAction
 
-        showDelayedTask = Task { @MainActor in
-            if delay > 0 {
-                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                if Task.isCancelled { return }
-            }
+        let presentPanel = { @MainActor in
             let p = self.ensurePanel()
             if let screen = NSScreen.main {
                 let margin: CGFloat = 28
@@ -73,9 +71,19 @@ public final class QuickActionProgressHUD: ObservableObject {
             }
             p.alphaValue = 0
             p.orderFront(nil)
-            await NSAnimationContext.runAnimationGroup { ctx in
+            NSAnimationContext.runAnimationGroup { ctx in
                 ctx.duration = 0.25
                 p.animator().alphaValue = 1.0
+            }
+        }
+
+        if delay <= 0 {
+            presentPanel()
+        } else {
+            showDelayedTask = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                if Task.isCancelled { return }
+                presentPanel()
             }
         }
     }
@@ -90,20 +98,30 @@ public final class QuickActionProgressHUD: ObservableObject {
         }
     }
 
-    public func finish(message: String = "完成") {
+    public func finish(message: String = "完成", isSuccess: Bool = true, displayDuration: TimeInterval = 1.8) {
         showDelayedTask?.cancel()
         showDelayedTask = nil
 
-        guard let p = panel, p.isVisible else {
-            return
+        let p = ensurePanel()
+        if !p.isVisible {
+            if let screen = NSScreen.main {
+                let margin: CGFloat = 28
+                let originX = screen.visibleFrame.maxX - 330 - margin
+                let originY = screen.visibleFrame.minY + margin
+                p.setFrameOrigin(NSPoint(x: originX, y: originY))
+            }
+            p.alphaValue = 1.0
+            p.orderFront(nil)
         }
 
         self.isCompleted = true
+        self.isFailed = !isSuccess
         self.subtitle = message
         self.progress = 1.0
 
         dismissTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 800_000_000)
+            let durationNanos = UInt64(displayDuration * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: durationNanos)
             if Task.isCancelled { return }
             await NSAnimationContext.runAnimationGroup { ctx in
                 ctx.duration = 0.3
@@ -128,12 +146,12 @@ public struct QuickActionProgressHUDView: View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(hud.isCompleted ? Color.green.opacity(0.18) : Color.accentColor.opacity(0.15))
+                    .fill(hud.isFailed ? Color.red.opacity(0.18) : (hud.isCompleted ? Color.green.opacity(0.18) : Color.accentColor.opacity(0.15)))
                     .frame(width: 38, height: 38)
 
-                Image(systemName: hud.isCompleted ? "checkmark" : hud.systemSymbol)
+                Image(systemName: hud.isFailed ? "exclamationmark.triangle.fill" : (hud.isCompleted ? "checkmark" : hud.systemSymbol))
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(hud.isCompleted ? .green : .accentColor)
+                    .foregroundColor(hud.isFailed ? .red : (hud.isCompleted ? .green : .accentColor))
             }
 
             VStack(alignment: .leading, spacing: 5) {
@@ -149,12 +167,12 @@ public struct QuickActionProgressHUDView: View {
                 } else {
                     ProgressView(value: hud.progress, total: 1.0)
                         .progressViewStyle(.linear)
-                        .tint(hud.isCompleted ? .green : .accentColor)
+                        .tint(hud.isFailed ? .red : (hud.isCompleted ? .green : .accentColor))
                 }
 
                 Text(hud.subtitle)
                     .font(.system(size: 10))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(hud.isFailed ? .red : .secondary)
                     .lineLimit(1)
             }
 

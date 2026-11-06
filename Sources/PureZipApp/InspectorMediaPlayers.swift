@@ -343,6 +343,14 @@ public struct InspectorVideoPlayerView: View {
 
     private func togglePlay() {
         if player == nil {
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                if let entry = session.selectedEntryPreview?.entry {
+                    Task {
+                        await session.loadEntryPreview(for: entry)
+                    }
+                }
+                return
+            }
             initializePlayer(autoPlay: true)
             return
         }

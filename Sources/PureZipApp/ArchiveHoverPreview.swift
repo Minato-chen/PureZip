@@ -34,7 +34,7 @@ public final class PreviewArtifactCache {
         pdfPagesCache.countLimit = 30
         textCache.countLimit = 200
         dimensionsCache.countLimit = 500
-        sweepDiskCache()
+        sweepOrphanedFilesOnStartup()
     }
 
     public func image(for key: String) -> NSImage? {
@@ -121,12 +121,10 @@ public final class PreviewArtifactCache {
 
     // Shared disk cache for extracted media/document preview files so Hover, Inspector, and Spacebar QuickLook
     // share a single extraction instead of re-extracting large video/audio files multiple times.
-    public static let maxPreviewDiskBytes: Int64 = 150 * 1024 * 1024 // 150 MB
-    public static let targetPreviewDiskBytes: Int64 = 80 * 1024 * 1024 // 80 MB
     private let fileCacheLock = NSLock()
     private var extractedFileCache: [String: URL] = [:]
     private var extractedFileOrder: [String] = []
-    private let maxCachedExtractedFiles = 12
+    private let maxCachedExtractedFiles = 4
     private var inFlightExtractions: [String: Task<URL, Error>] = [:]
     private let previewMediaCacheDir: URL = {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("PureZipSharedPreviewMedia", isDirectory: true)
@@ -134,41 +132,17 @@ public final class PreviewArtifactCache {
         return dir
     }()
 
-    public func sweepDiskCache(maxAgeHours: Double = 12) {
+    public func sweepOrphanedFilesOnStartup() {
         fileCacheLock.lock()
         defer { fileCacheLock.unlock() }
 
         let fm = FileManager.default
-        guard let items = try? fm.contentsOfDirectory(
-            at: previewMediaCacheDir,
-            includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey],
-            options: .skipsHiddenFiles
-        ) else { return }
-
-        let now = Date()
-        let cutoffDate = now.addingTimeInterval(-maxAgeHours * 3600)
-        var totalBytes: Int64 = 0
-        var fileMetaList: [(url: URL, size: Int64, date: Date)] = []
+        let activePaths = Set(extractedFileCache.values.map { $0.standardizedFileURL.path })
+        guard let items = try? fm.contentsOfDirectory(at: previewMediaCacheDir, includingPropertiesForKeys: nil) else { return }
 
         for item in items {
-            let res = try? item.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
-            let size = Int64(res?.fileSize ?? 0)
-            let date = res?.contentModificationDate ?? .distantPast
-
-            if date < cutoffDate {
+            if !activePaths.contains(item.standardizedFileURL.path) {
                 try? fm.removeItem(at: item)
-                continue
-            }
-            totalBytes += size
-            fileMetaList.append((url: item, size: size, date: date))
-        }
-
-        if totalBytes > Self.maxPreviewDiskBytes {
-            fileMetaList.sort { $0.date < $1.date }
-            for entry in fileMetaList {
-                if totalBytes <= Self.targetPreviewDiskBytes { break }
-                try? fm.removeItem(at: entry.url)
-                totalBytes -= entry.size
             }
         }
     }
@@ -190,6 +164,9 @@ public final class PreviewArtifactCache {
         fileCacheLock.lock()
         defer { fileCacheLock.unlock() }
         if let url = extractedFileCache[key], FileManager.default.fileExists(atPath: url.path) {
+            // Touch LRU order on hit
+            extractedFileOrder.removeAll { $0 == key }
+            extractedFileOrder.append(key)
             return url
         }
         extractedFileCache.removeValue(forKey: key)
@@ -224,6 +201,9 @@ public final class PreviewArtifactCache {
             }
         }
 
+        // Touch the destination file so its filesystem mtime reflects extraction time, not archive internal date
+        try? fm.setAttributes([.modificationDate: Date()], ofItemAtPath: destURL.path)
+
         fileCacheLock.lock()
         defer { fileCacheLock.unlock() }
         extractedFileCache[key] = destURL
@@ -234,9 +214,6 @@ public final class PreviewArtifactCache {
             if let oldURL = extractedFileCache.removeValue(forKey: oldestKey) {
                 try? fm.removeItem(at: oldURL)
             }
-        }
-        Task.detached(priority: .utility) { [weak self] in
-            self?.sweepDiskCache()
         }
         return destURL
     }

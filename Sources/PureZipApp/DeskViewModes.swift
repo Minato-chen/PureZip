@@ -469,6 +469,60 @@ public final class ColumnBrowserState: ObservableObject {
         }
     }
 
+    public func navigateAndSelect(entry: ArchiveEntry, session: ArchiveBrowsingSession) {
+        childLoadTask?.cancel()
+        guard let index = session.entryIndex else { return }
+
+        let cleanPath = entry.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let parentPath: String
+        if let lastSlash = cleanPath.lastIndex(of: "/") {
+            parentPath = String(cleanPath[..<lastSlash])
+        } else {
+            parentPath = ""
+        }
+
+        session.currentDirectoryPath = parentPath
+        currentColumnPath = parentPath
+
+        let totalRoots = (try? index.childCount(of: "", includeAuxiliary: session.includeAuxiliary)) ?? 0
+        let roots = (try? index.children(of: "", offset: 0, limit: pageSize, includeAuxiliary: session.includeAuxiliary)) ?? []
+        var nodes: [ColumnNode] = [
+            ColumnNode(path: "", entries: roots, totalCount: totalRoots, selectedName: nil, width: self.columnWidth)
+        ]
+
+        if !parentPath.isEmpty {
+            let parts = parentPath.split(separator: "/").map(String.init)
+            var cur = ""
+            for (idx, part) in parts.enumerated() {
+                if idx < nodes.count {
+                    nodes[idx].selectedName = part
+                }
+                cur = cur.isEmpty ? part : "\(cur)/\(part)"
+                let total = (try? index.childCount(of: cur, includeAuxiliary: session.includeAuxiliary)) ?? 0
+                let subs = (try? index.children(of: cur, offset: 0, limit: pageSize, includeAuxiliary: session.includeAuxiliary)) ?? []
+                nodes.append(ColumnNode(path: cur, entries: subs, totalCount: total, selectedName: nil, width: self.columnWidth))
+            }
+        }
+
+        if let lastIdx = nodes.indices.last {
+            nodes[lastIdx].selectedName = entry.name
+            if !nodes[lastIdx].entries.contains(where: { $0.id == entry.id }) {
+                nodes[lastIdx].entries.append(entry)
+            }
+        }
+
+        self.columnNodes = nodes
+        let targetColIndex = max(0, nodes.count - 1)
+        self.focusedColumnIndex = targetColIndex
+        self.activeEntry = entry
+        session.selectEntry(entry)
+        updateActiveDetails(for: entry, session: session)
+
+        if entry.type == .directory {
+            handleSelection(entry: entry, at: targetColIndex, session: session, debounceChild: false)
+        }
+    }
+
     public func handleSelection(entry: ArchiveEntry, at columnIndex: Int, session: ArchiveBrowsingSession, debounceChild: Bool = false) {
         guard columnIndex < columnNodes.count else { return }
         focusedColumnIndex = columnIndex

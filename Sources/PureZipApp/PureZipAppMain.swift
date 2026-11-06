@@ -31,6 +31,21 @@ public final class PureZipApplicationDelegate: NSObject, NSApplicationDelegate {
             if let window = NSApp.keyWindow,
                let responder = window.firstResponder,
                responder.isKind(of: NSTextView.self) || responder.isKind(of: NSTextField.self) {
+                if event.keyCode == 53 && !self.session.searchQuery.isEmpty {
+                    // Escape: clear search and exit search field
+                    self.session.searchQuery = ""
+                    window.makeFirstResponder(nil)
+                    return nil
+                }
+                if (event.keyCode == 36 || event.keyCode == 76) && !self.session.searchQuery.isEmpty {
+                    // Return: reveal first/selected entry in column hierarchy
+                    let target = self.session.selectedEntryPreview?.entry ?? (self.session.selectedEntryID.flatMap { id in self.session.displayedEntries.first(where: { $0.id == id }) }) ?? self.session.displayedEntries.first
+                    if let entry = target {
+                        self.session.revealInColumnBrowser(entry: entry)
+                        window.makeFirstResponder(nil)
+                        return nil
+                    }
+                }
                 return event
             }
 
@@ -96,11 +111,6 @@ public final class PureZipApplicationDelegate: NSObject, NSApplicationDelegate {
 
         // Auto-register Finder extension and LaunchServices in background for dev/local testing
         registerSystemIntegrationIfNeeded()
-
-        // Prune any stale temporary/preview files left from prior runs
-        Task.detached(priority: .utility) {
-            PureZipPreferences.performDiskCleanup()
-        }
     }
 
     /// Explicitly binds `NSApp.applicationIconImage` from `AppIcon.icns` so Dock/Switcher icons are guaranteed even in debug/CLI launches

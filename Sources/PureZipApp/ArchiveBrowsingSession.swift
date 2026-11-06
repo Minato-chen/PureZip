@@ -920,6 +920,24 @@ public final class ArchiveBrowsingSession: ObservableObject {
         guard currentArchiveURL != nil else { return false }
 
         if viewMode == .columns && !isCapsuleMode {
+            if !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                // When searching in column view, navigate within search results
+                let entries = displayedEntries
+                guard !entries.isEmpty else { return false }
+                let currentIndex = entries.firstIndex(where: { $0.id == selectedEntryID })
+                switch direction {
+                case .up:
+                    let target = currentIndex.map { max(0, $0 - 1) } ?? (entries.count - 1)
+                    selectEntry(entries[target])
+                    return true
+                case .down:
+                    let target = currentIndex.map { min(entries.count - 1, $0 + 1) } ?? 0
+                    selectEntry(entries[target])
+                    return true
+                case .left, .right:
+                    return false
+                }
+            }
             return columnBrowserState.navigate(direction: direction, session: self)
         }
 
@@ -981,6 +999,12 @@ public final class ArchiveBrowsingSession: ObservableObject {
     @discardableResult
     public func activateSelectedEntry() -> Bool {
         if viewMode == .columns && !isCapsuleMode {
+            if !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if let selID = selectedEntryID, let entry = displayedEntries.first(where: { $0.id == selID }) {
+                    revealInColumnBrowser(entry: entry)
+                    return true
+                }
+            }
             if let entry = columnBrowserState.activeEntry {
                 if entry.type == .directory {
                     if columnBrowserState.enterChildColumn(session: self) {
@@ -997,6 +1021,11 @@ public final class ArchiveBrowsingSession: ObservableObject {
             return true
         }
         return false
+    }
+
+    public func revealInColumnBrowser(entry: ArchiveEntry) {
+        searchQuery = ""
+        columnBrowserState.navigateAndSelect(entry: entry, session: self)
     }
 
     private func cleanupActiveMediaTemp() {
@@ -1020,14 +1049,14 @@ public final class ArchiveBrowsingSession: ObservableObject {
             )
             return
         }
-        // Cap live preview extraction: Media up to 300 MiB (with fast keyframes & audio sampling), Nested Archives up to 500 MiB, Images/RAW up to 200 MiB, documents/text up to 15 MiB
+        // Cap live preview extraction: Media up to 2 GiB (with fast keyframes & audio sampling), Nested Archives up to 500 MiB, Images/RAW up to 200 MiB, documents/text up to 15 MiB
         let ext = (entry.name as NSString).pathExtension.lowercased()
         let isMedia = MediaPreviewExtractor.isAudio(ext: ext) || MediaPreviewExtractor.isVideo(ext: ext)
         let isNested = entry.isNestedArchive
         let isImage = ImagePreviewHelper.isSupportedImage(ext: ext)
         let maxLimit: Int64
         if isMedia {
-            maxLimit = 300 * 1024 * 1024
+            maxLimit = 2 * 1024 * 1024 * 1024
         } else if isNested {
             maxLimit = 500 * 1024 * 1024
         } else if isImage {
@@ -2204,15 +2233,72 @@ public final class ArchiveBrowsingSession: ObservableObject {
         }
     }
 
+    public static func friendlyIntegrityErrorMessage(_ error: Error) -> String {
+        if case ArchiveEngineError.wrongPassword = error {
+            return "归档已加密，需要解压密码"
+        }
+        let desc = error.localizedDescription
+        if desc.localizedCaseInsensitiveContains("wrong password") ||
+           desc.localizedCaseInsensitiveContains("password required") ||
+           desc.localizedCaseInsensitiveContains("can not open encrypted") {
+            return "归档已加密，需要解压密码"
+        }
+        return desc
+    }
+
     public func testCurrentArchiveIntegrity() async {
         guard let archiveURL = currentArchiveURL else { return }
         isBusy = true
         statusMessage = "正在校验 \(archiveURL.lastPathComponent) 的 CRC32 与结构完整性..."
+
+        QuickActionProgressHUD.shared.show(
+            title: "正在校验归档完整性",
+            symbol: "checkmark.shield",
+            delay: 0
+        )
+        QuickActionProgressHUD.shared.update(progress: 0.5, subtitle: archiveURL.lastPathComponent)
+
         do {
             try await broker.test(archiveURL)
             statusMessage = "校验通过: \(archiveURL.lastPathComponent) 所有条目 CRC32 完整无损"
+            QuickActionProgressHUD.shared.finish(
+                message: "校验通过: CRC32 与结构完整无损",
+                isSuccess: true,
+                displayDuration: 2.2
+            )
+
+            await MainActor.run {
+                let alert = NSAlert()
+                alert.messageText = "归档完整性校验通过"
+                alert.informativeText = "已对「\(archiveURL.lastPathComponent)」内部所有文件条目与结构完成校验，CRC32 匹配无损，未发现任何数据损坏。"
+                alert.alertStyle = .informational
+                alert.addButton(withTitle: "好")
+                if let window = NSApp.keyWindow ?? NSApp.mainWindow {
+                    alert.beginSheetModal(for: window)
+                } else {
+                    alert.runModal()
+                }
+            }
         } catch {
-            statusMessage = "校验发现异常: \(error.localizedDescription)"
+            let friendly = Self.friendlyIntegrityErrorMessage(error)
+            statusMessage = "校验发现异常: \(friendly)"
+            QuickActionProgressHUD.shared.finish(
+                message: "校验异常: \(friendly)",
+                isSuccess: false,
+                displayDuration: 3.5
+            )
+            await MainActor.run {
+                let alert = NSAlert()
+                alert.messageText = "归档校验未通过"
+                alert.informativeText = "在校验「\(archiveURL.lastPathComponent)」时发现异常：\n\(friendly)\n\n建议检查该压缩包是否损坏、分卷不完整或需要解压密码。"
+                alert.alertStyle = .critical
+                alert.addButton(withTitle: "确定")
+                if let window = NSApp.keyWindow ?? NSApp.mainWindow {
+                    alert.beginSheetModal(for: window)
+                } else {
+                    alert.runModal()
+                }
+            }
         }
         isBusy = false
     }
@@ -2357,7 +2443,7 @@ public final class ArchiveBrowsingSession: ObservableObject {
 
             try Data("""
             public struct DemoEngine {
-                public static let version = "1.1.1"
+                public static let version = "1.1.2"
             }
             """.utf8).write(to: srcDir.appendingPathComponent("DemoEngine.swift"))
 
@@ -2547,11 +2633,63 @@ public final class ArchiveBrowsingSession: ObservableObject {
                 QuickActionProgressHUD.shared.finish(message: "批量解压完成")
             }
         case .testArchive:
-            if let first = req.sources.first {
-                let primary = ArchiveVolumeFamily.primaryURL(for: first)
-                await openArchive(at: primary)
-                openMainWindow()
-                await testCurrentArchiveIntegrity()
+            hideAuxiliaryWindowsIfBrowsingInactive()
+            let distinct = ArchiveVolumeFamily.deduplicatedPrimaryArchives(from: req.sources)
+            guard !distinct.isEmpty else { return }
+
+            if distinct.count == 1, let primary = distinct.first {
+                QuickActionProgressHUD.shared.show(
+                    title: "正在校验 \(primary.lastPathComponent) 完整性",
+                    symbol: "checkmark.shield",
+                    delay: 0
+                )
+                do {
+                    try await broker.test(primary)
+                    QuickActionProgressHUD.shared.finish(
+                        message: "校验通过: CRC32 与结构完整无损",
+                        isSuccess: true,
+                        displayDuration: 2.2
+                    )
+                } catch {
+                    let friendly = Self.friendlyIntegrityErrorMessage(error)
+                    QuickActionProgressHUD.shared.finish(
+                        message: "校验异常: \(friendly)",
+                        isSuccess: false,
+                        displayDuration: 3.5
+                    )
+                }
+            } else {
+                QuickActionProgressHUD.shared.show(
+                    title: "正在批量测试 \(distinct.count) 个压缩包",
+                    symbol: "checkmark.shield",
+                    delay: 0
+                )
+                var failedArchives: [(URL, Error)] = []
+                for (idx, arch) in distinct.enumerated() {
+                    let progress = Double(idx) / Double(distinct.count)
+                    QuickActionProgressHUD.shared.update(
+                        progress: progress,
+                        subtitle: "正在校验 (\(idx + 1)/\(distinct.count)): \(arch.lastPathComponent)"
+                    )
+                    do {
+                        try await broker.test(arch)
+                    } catch {
+                        failedArchives.append((arch, error))
+                    }
+                }
+                if failedArchives.isEmpty {
+                    QuickActionProgressHUD.shared.finish(
+                        message: "批量校验完成: 全部 \(distinct.count) 个压缩包均完整无损",
+                        isSuccess: true,
+                        displayDuration: 2.5
+                    )
+                } else {
+                    QuickActionProgressHUD.shared.finish(
+                        message: "校验完成: \(failedArchives.count)/\(distinct.count) 个压缩包损坏或异常",
+                        isSuccess: false,
+                        displayDuration: 4.0
+                    )
+                }
             }
         case .quickCompressTo:
             hideAuxiliaryWindowsIfBrowsingInactive()

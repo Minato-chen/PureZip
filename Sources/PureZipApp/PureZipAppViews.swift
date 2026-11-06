@@ -1084,6 +1084,14 @@ public struct ExtractAllSplitButton: View {
                 } label: {
                     Label("解压并递归展开到其他位置...", systemImage: "folder.badge.gearshape")
                 }
+
+                Divider()
+
+                Button {
+                    Task { await session.testCurrentArchiveIntegrity() }
+                } label: {
+                    Label("测试归档完整性 (CRC32)", systemImage: "checkmark.shield")
+                }
             } label: {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8.5, weight: .bold))
@@ -2101,8 +2109,13 @@ public struct CompleteDeskView: View {
                     // Dynamic View Mode Switcher
                     switch session.viewMode {
                     case .columns:
-                        EntryColumnBrowserView(session: session)
-                            .padding(.bottom, 60)
+                        if !session.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            ColumnSearchResultsView(session: session)
+                                .padding(.bottom, 60)
+                        } else {
+                            EntryColumnBrowserView(session: session)
+                                .padding(.bottom, 60)
+                        }
                     case .icons:
                         EntryIconGridView(session: session)
                             .padding(.bottom, 60)
@@ -2137,10 +2150,20 @@ public struct CompleteDeskView: View {
                                             HStack(spacing: 10) {
                                                 ArchiveEntryRowIconView(entry: entry)
 
-                                                Text(entry.name)
-                                                    .font(.system(size: 13, weight: .medium))
-                                                    .foregroundStyle(isSelected ? .white : .primary)
-                                                    .lineLimit(1)
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(entry.name)
+                                                        .font(.system(size: 13, weight: .medium))
+                                                        .foregroundStyle(isSelected ? .white : .primary)
+                                                        .lineLimit(1)
+
+                                                    if !session.searchQuery.isEmpty {
+                                                        let parent = (entry.path as NSString).deletingLastPathComponent
+                                                        Text(parent.isEmpty ? "根目录" : parent)
+                                                            .font(.system(size: 10.5))
+                                                            .foregroundStyle(isSelected ? Color.white.opacity(0.85) : Color.secondary)
+                                                            .lineLimit(1)
+                                                    }
+                                                }
                                             }
 
                                             Spacer()
@@ -2817,14 +2840,46 @@ public struct CompleteDeskView: View {
                 }
                 .frame(maxWidth: .infinity)
             } else {
-                VStack(spacing: 12) {
+                VStack(spacing: 14) {
                     Spacer()
-                    Image(systemName: "doc.text.magnifyingglass")
-                        .font(.system(size: 36))
-                        .foregroundStyle(Color(NSColor.tertiaryLabelColor))
-                    Text("选中条目以查看项目详情")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
+                    Image(systemName: "archivebox")
+                        .font(.system(size: 34))
+                        .foregroundStyle(Color.accentColor.opacity(0.8))
+
+                    if let archURL = session.currentArchiveURL {
+                        VStack(spacing: 4) {
+                            Text(archURL.lastPathComponent)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.center)
+                            Text("共 \(session.totalIndexedCount) 项")
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 16)
+
+                        Button {
+                            Task { await session.testCurrentArchiveIntegrity() }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "checkmark.shield")
+                                Text("测试归档完整性")
+                            }
+                            .font(.system(size: 11.5, weight: .medium))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
+                            .background(Color.accentColor.opacity(0.12))
+                            .clipShape(Capsule())
+                            .foregroundStyle(Color.accentColor)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 4)
+                    } else {
+                        Text("选中条目以查看项目详情")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                    }
                     Spacer()
                 }
                 .frame(maxWidth: .infinity)
@@ -2839,6 +2894,241 @@ public struct CompleteDeskView: View {
         let ext = (entry.name as NSString).pathExtension.uppercased()
         if ext.isEmpty { return "文件" }
         return "\(ext) 文档"
+    }
+}
+
+// MARK: - Column View Native Search Results
+
+public struct ColumnSearchResultsView: View {
+    @ObservedObject var session: ArchiveBrowsingSession
+    @Environment(\.colorScheme) private var colorScheme
+
+    public init(session: ArchiveBrowsingSession) {
+        self.session = session
+    }
+
+    public var body: some View {
+        VStack(spacing: 0) {
+            // Search Header Indicator
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.05, green: 0.48, blue: 0.98))
+
+                Text("搜索结果: “\(session.searchQuery)”")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Text("共 \(session.displayedEntries.count) 项")
+                    .font(.system(size: 11, weight: .medium))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(colorScheme == .dark ? Color(white: 0.22) : Color(white: 0.88))
+                    .cornerRadius(4)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Text("双击或按回车可在分栏中直接定位")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+
+                Button {
+                    session.searchQuery = ""
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "xmark.circle.fill")
+                        Text("清空搜索")
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3.5)
+                    .background(colorScheme == .dark ? Color(white: 0.20) : Color(white: 0.90))
+                    .clipShape(Capsule())
+                    .foregroundStyle(.primary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 8)
+            .background(colorScheme == .dark ? Color(white: 0.12).opacity(0.7) : Color(white: 0.96))
+
+            Divider()
+
+            // Column Header
+            HStack {
+                Text("名称")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 160, alignment: .leading)
+
+                Spacer()
+
+                Text("所在位置")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 220, alignment: .leading)
+
+                Text("大小")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 90, alignment: .leading)
+
+                Text("修改时间")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 140, alignment: .leading)
+
+                Text("操作")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 88, alignment: .center)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 6)
+
+            Divider()
+
+            if session.displayedEntries.isEmpty {
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 36))
+                        .foregroundStyle(.secondary.opacity(0.6))
+                    Text("未在归档中找到与 “\(session.searchQuery)” 匹配的条目")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 2) {
+                            ForEach(session.displayedEntries) { entry in
+                                let isSelected = session.selectedEntryID == entry.id
+                                HStack {
+                                    HStack(spacing: 10) {
+                                        ArchiveEntryRowIconView(entry: entry)
+
+                                        Text(entry.name)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(isSelected ? .white : .primary)
+                                            .lineLimit(1)
+                                    }
+                                    .frame(minWidth: 160, alignment: .leading)
+
+                                    Spacer()
+
+                                    // Location path
+                                    let parent = (entry.path as NSString).deletingLastPathComponent
+                                    Text(parent.isEmpty ? "根目录" : parent)
+                                        .font(.system(size: 11.5))
+                                        .foregroundStyle(isSelected ? Color.white.opacity(0.85) : Color.secondary)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                        .frame(width: 220, alignment: .leading)
+
+                                    Text(entry.type == .directory ? "--" : ByteCountFormatter.string(fromByteCount: entry.uncompressedSize, countStyle: .file))
+                                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                        .foregroundStyle(isSelected ? .white : .secondary)
+                                        .frame(width: 90, alignment: .leading)
+
+                                    Text(entryDateFormatted(entry: entry))
+                                        .font(.system(size: 12, design: .monospaced))
+                                        .foregroundStyle(isSelected ? .white : .secondary)
+                                        .frame(width: 140, alignment: .leading)
+
+                                    Button {
+                                        session.revealInColumnBrowser(entry: entry)
+                                    } label: {
+                                        HStack(spacing: 3) {
+                                            Image(systemName: "arrow.forward.to.line")
+                                                .font(.system(size: 9.5))
+                                            Text("分栏定位")
+                                                .font(.system(size: 11, weight: .medium))
+                                        }
+                                        .padding(.horizontal, 7)
+                                        .padding(.vertical, 3.5)
+                                        .background(isSelected ? Color.white.opacity(0.25) : (colorScheme == .dark ? Color(white: 0.25) : Color(white: 0.90)))
+                                        .cornerRadius(4)
+                                        .foregroundStyle(isSelected ? .white : .primary)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .frame(width: 88, alignment: .center)
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 7)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(isSelected ? Color.accentColor : Color.clear)
+                                )
+                                .contentShape(Rectangle())
+                                .id(entry.id)
+                                .onTapGesture(count: 2) {
+                                    session.revealInColumnBrowser(entry: entry)
+                                }
+                                .onTapGesture(count: 1) {
+                                    session.selectEntry(entry)
+                                }
+                                .onHover { isHovered in
+                                    HoverPreviewCoordinator.shared.onRowHover(entry: entry, isHovered: isHovered, session: session)
+                                }
+                                .onDrag {
+                                    ArchiveDragExportManager.shared.itemProvider(for: entry, session: session)
+                                }
+                                .contextMenu {
+                                    Button {
+                                        session.revealInColumnBrowser(entry: entry)
+                                    } label: {
+                                        Label("在分栏视图中定位", systemImage: "arrow.forward.to.line")
+                                    }
+
+                                    Divider()
+
+                                    if entry.isNestedArchive {
+                                        Button {
+                                            Task { await session.openNestedArchive(entry: entry) }
+                                        } label: {
+                                            Label("进入内部压缩包浏览", systemImage: "arrow.right.doc.on.clipboard")
+                                        }
+
+                                        Button {
+                                            Task { await session.extractNestedArchiveEntryDirectly(entry) }
+                                        } label: {
+                                            Label("直接解压内部压缩包到同名文件夹", systemImage: "square.stack.3d.down.right")
+                                        }
+
+                                        Divider()
+                                    }
+
+                                    Button {
+                                        session.selectEntry(entry)
+                                        session.toggleQuickLookForSelected()
+                                    } label: {
+                                        Label("系统快速预览 (空格)", systemImage: "eye")
+                                    }
+
+                                    Button {
+                                        session.selectEntry(entry)
+                                        session.copySelectedEntry()
+                                    } label: {
+                                        Label("拷贝 (⌘C)", systemImage: "doc.on.doc")
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 6)
+                    }
+                }
+            }
+        }
+    }
+
+    private func entryDateFormatted(entry: ArchiveEntry) -> String {
+        guard let date = entry.modifiedAt else { return "--" }
+        return PureZipDateFormatter.entryListFormatter.string(from: date)
     }
 }
 
