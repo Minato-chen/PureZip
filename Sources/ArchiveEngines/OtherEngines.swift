@@ -96,7 +96,7 @@ public struct CompressedStreamEngine: ArchiveEngine {
         proc.standardError = errPipe
 
         try proc.run()
-        let errReadTask = Task.detached {
+        let errReadTask = Task.detached(priority: .userInitiated) {
             errPipe.fileHandleForReading.readDataToEndOfFile()
         }
         proc.waitUntilExit()
@@ -133,7 +133,7 @@ public struct CompressedStreamEngine: ArchiveEngine {
         proc.standardError = errPipe
 
         try proc.run()
-        let errReadTask = Task.detached {
+        let errReadTask = Task.detached(priority: .userInitiated) {
             errPipe.fileHandleForReading.readDataToEndOfFile()
         }
         proc.waitUntilExit()
@@ -252,16 +252,17 @@ public struct DiskImageEngine: ArchiveEngine {
     /// Automatically detaches / unmounts a DMG disk image or volume mount.
     @discardableResult
     public static func detach(diskImageURL: URL) -> Bool {
+        let resolvedURL = diskImageURL.resolvingSymlinksInPath()
         // 1. If path is a direct mountpoint (e.g. /Volumes/... or temporary PureZip_DMG_...), detach it directly first
         var isDir: ObjCBool = false
-        if diskImageURL.path.hasPrefix("/Volumes/") ||
-            (FileManager.default.fileExists(atPath: diskImageURL.path, isDirectory: &isDir) && isDir.boolValue) {
+        if resolvedURL.path.hasPrefix("/Volumes/") ||
+            (FileManager.default.fileExists(atPath: resolvedURL.path, isDirectory: &isDir) && isDir.boolValue) {
             let mountPath: String
-            if diskImageURL.path.hasPrefix("/Volumes/") {
-                let volumeName = diskImageURL.pathComponents.count > 2 ? diskImageURL.pathComponents[2] : ""
+            if resolvedURL.path.hasPrefix("/Volumes/") {
+                let volumeName = resolvedURL.pathComponents.count > 2 ? resolvedURL.pathComponents[2] : ""
                 mountPath = "/Volumes/\(volumeName)"
             } else {
-                mountPath = diskImageURL.path
+                mountPath = resolvedURL.path
             }
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
@@ -282,7 +283,7 @@ public struct DiskImageEngine: ArchiveEngine {
         var mountPoints: [String] = []
         let sections = output.components(separatedBy: "================================================")
         for sec in sections {
-            if sec.contains(diskImageURL.path) {
+            if sec.contains(diskImageURL.path) || sec.contains(resolvedURL.path) {
                 let lines = sec.components(separatedBy: "\n")
                 for line in lines {
                     if let r = line.range(of: "/Volumes/") {
@@ -346,7 +347,10 @@ public struct DiskImageEngine: ArchiveEngine {
                         }
                         // Ensure 7zz actually unpacked the inner filesystem and not just raw partition blocks
                         let visibleEntries = collected.filter { !$0.isAuxiliary && !$0.isDiskImageBackground }
-                        if !visibleEntries.isEmpty {
+                        let isRawPartitionOnly = visibleEntries.allSatisfy { e in
+                            e.path.contains("disk image") || e.path.contains("Apple_APFS") || e.path.contains("Apple_HFS") || e.path.contains("Apple_partition") || e.name.contains("disk image")
+                        }
+                        if !visibleEntries.isEmpty && !isRawPartitionOnly {
                             continuation.yield(collected)
                             continuation.finish()
                             return
@@ -404,36 +408,54 @@ public struct DiskImageEngine: ArchiveEngine {
         password: String? = nil,
         continuation: AsyncThrowingStream<[ArchiveEntry], Error>.Continuation
     ) async throws {
-        let mountDir = FileManager.default.temporaryDirectory.appendingPathComponent("PureZip_DMG_\(UUID().uuidString)")
+        let mountDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PureZip_DMG_\(UUID().uuidString)")
+            .resolvingSymlinksInPath()
         try FileManager.default.createDirectory(at: mountDir, withIntermediateDirectories: true)
+        var isDetached = false
         defer {
-            _ = detach(diskImageURL: mountDir)
-            try? FileManager.default.removeItem(at: mountDir)
+            if !isDetached {
+                _ = detach(diskImageURL: mountDir)
+                try? FileManager.default.removeItem(at: mountDir)
+            }
         }
 
         var args = ["attach", url.path, "-readonly", "-nobrowse", "-mountpoint", mountDir.path]
         if let pw = password, !pw.isEmpty {
             args.append(contentsOf: ["-passphrase", pw])
         }
-        _ = try SevenZipEngine.runProcess(
-            executable: URL(fileURLWithPath: "/usr/bin/hdiutil"),
-            arguments: args
-        )
+        do {
+            _ = try SevenZipEngine.runProcess(
+                executable: URL(fileURLWithPath: "/usr/bin/hdiutil"),
+                arguments: args
+            )
+        } catch {
+            // Brief backoff retry in case a previous attach is still cleanly unlocking
+            try await Task.sleep(nanoseconds: 200_000_000)
+            _ = try SevenZipEngine.runProcess(
+                executable: URL(fileURLWithPath: "/usr/bin/hdiutil"),
+                arguments: args
+            )
+        }
 
         guard let enumerator = FileManager.default.enumerator(
             at: mountDir,
             includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey, .isSymbolicLinkKey],
             options: []
         ) else {
+            _ = detach(diskImageURL: mountDir)
+            try? FileManager.default.removeItem(at: mountDir)
+            isDetached = true
             continuation.finish()
             return
         }
 
         var entries: [ArchiveEntry] = []
-        let mountPath = mountDir.path
+        let resolvedMountDir = mountDir.resolvingSymlinksInPath()
+        let mountPath = resolvedMountDir.path
 
         while let fileURL = enumerator.nextObject() as? URL {
-            let fullPath = fileURL.path
+            let fullPath = fileURL.resolvingSymlinksInPath().path
             guard fullPath.hasPrefix(mountPath) else { continue }
             let rel = String(fullPath.dropFirst(mountPath.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             guard !rel.isEmpty else { continue }
@@ -459,6 +481,11 @@ public struct DiskImageEngine: ArchiveEngine {
             entries.append(entry)
         }
 
+        // Detach and clean up before yielding so subsequent immediate operations (like extract) do not race on busy disk
+        _ = detach(diskImageURL: mountDir)
+        try? FileManager.default.removeItem(at: mountDir)
+        isDetached = true
+
         continuation.yield(entries)
         continuation.finish()
     }
@@ -470,7 +497,9 @@ public struct DiskImageEngine: ArchiveEngine {
         password: String? = nil,
         progress: (@Sendable (ArchiveTaskProgress) -> Void)? = nil
     ) async throws {
-        let mountDir = FileManager.default.temporaryDirectory.appendingPathComponent("PureZip_DMG_\(UUID().uuidString)")
+        let mountDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PureZip_DMG_\(UUID().uuidString)")
+            .resolvingSymlinksInPath()
         try FileManager.default.createDirectory(at: mountDir, withIntermediateDirectories: true)
         defer {
             _ = detach(diskImageURL: mountDir)
@@ -481,10 +510,19 @@ public struct DiskImageEngine: ArchiveEngine {
         if let pw = password, !pw.isEmpty {
             args.append(contentsOf: ["-passphrase", pw])
         }
-        _ = try SevenZipEngine.runProcess(
-            executable: URL(fileURLWithPath: "/usr/bin/hdiutil"),
-            arguments: args
-        )
+        do {
+            _ = try SevenZipEngine.runProcess(
+                executable: URL(fileURLWithPath: "/usr/bin/hdiutil"),
+                arguments: args
+            )
+        } catch {
+            // Brief backoff retry in case a previous attach is still cleanly unlocking
+            try await Task.sleep(nanoseconds: 200_000_000)
+            _ = try SevenZipEngine.runProcess(
+                executable: URL(fileURLWithPath: "/usr/bin/hdiutil"),
+                arguments: args
+            )
+        }
 
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
 

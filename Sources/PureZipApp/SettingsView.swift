@@ -155,6 +155,10 @@ public final class SettingsViewModel: ObservableObject {
         get { prefs.deskVideoAutoPlay }
         set { prefs.deskVideoAutoPlay = newValue; objectWillChange.send() }
     }
+    public var deskAudioAutoPlay: Bool {
+        get { prefs.deskAudioAutoPlay }
+        set { prefs.deskAudioAutoPlay = newValue; objectWillChange.send() }
+    }
     public var deskMediaAlwaysMute: Bool {
         get { prefs.deskMediaAlwaysMute }
         set { prefs.deskMediaAlwaysMute = newValue; objectWillChange.send() }
@@ -196,6 +200,10 @@ public final class SettingsViewModel: ObservableObject {
     public var pureShelfAutoClearAfterPackaging: Bool {
         get { prefs.pureShelfAutoClearAfterPackaging }
         set { prefs.pureShelfAutoClearAfterPackaging = newValue; objectWillChange.send() }
+    }
+    public var pureShelfRemoveOnDragOut: Bool {
+        get { prefs.pureShelfRemoveOnDragOut }
+        set { prefs.pureShelfRemoveOnDragOut = newValue; objectWillChange.send() }
     }
     public var pureShelfDefaultFormat: String {
         get { prefs.pureShelfDefaultFormat }
@@ -361,6 +369,7 @@ public final class SettingsViewModel: ObservableObject {
 public struct SettingsView: View {
     @ObservedObject var session: ArchiveBrowsingSession
     @ObservedObject var model = SettingsViewModel()
+    @ObservedObject private var extensionManager = FinderSyncExtensionManager.shared
     @Environment(\.colorScheme) private var colorScheme
 
     public enum SettingsTab: String, CaseIterable, Identifiable {
@@ -530,6 +539,68 @@ public struct SettingsView: View {
                 }
                 .padding(16)
                 .background(Color(NSColor.controlBackgroundColor))
+                .cornerRadius(10)
+            }
+
+            // 访达（Finder）右键菜单扩展
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(L10n.t("访达（Finder）右键扩展"))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if extensionManager.isChecking {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(extensionManager.isRegistered ? Color.green : Color.orange)
+                                .frame(width: 8, height: 8)
+                            Text(extensionManager.isRegistered ? "已就绪" : "未生效")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(extensionManager.isRegistered ? .green : .orange)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule()
+                                .fill((extensionManager.isRegistered ? Color.green : Color.orange).opacity(0.12))
+                        )
+                    }
+                }
+
+                VStack(spacing: 0) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(L10n.t("在访达中显示 PureZip 右键菜单"))
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.primary)
+                            Text(extensionManager.statusMessage.isEmpty ? L10n.t("提供一键压缩、解压到同名文件夹等快捷动作。") : extensionManager.statusMessage)
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color(white: 0.55))
+                        }
+                        Spacer()
+                        HStack(spacing: 10) {
+                            Button {
+                                Task { await extensionManager.repairAndRegister() }
+                            } label: {
+                                Label("一键修复与注册", systemImage: "arrow.triangle.2.circlepath")
+                                    .font(.system(size: 12))
+                            }
+                            .buttonStyle(.borderedProminent)
+
+                            Button {
+                                extensionManager.openSystemSettingsExtensions()
+                            } label: {
+                                Text("系统设置...")
+                                    .font(.system(size: 12))
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    }
+                    .padding(16)
+                    .background(Color(NSColor.controlBackgroundColor))
+                }
                 .cornerRadius(10)
             }
 
@@ -1392,6 +1463,28 @@ public struct SettingsView: View {
 
                     Divider()
 
+                    // 音频自动播放行为
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(L10n.t("音频自动播放行为"))
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.primary)
+                            Text(L10n.t("在右侧属性栏选中音频文件时的初始行为。"))
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color(white: 0.55))
+                        }
+                        Spacer()
+                        Picker("", selection: $model.deskAudioAutoPlay) {
+                            Text("默认自动开始播放").tag(true)
+                            Text("等待手动点击播放 (推荐)").tag(false)
+                        }
+                        .frame(width: 200)
+                    }
+                    .padding(16)
+                    .background(Color(NSColor.controlBackgroundColor))
+
+                    Divider()
+
                     // 音视频是否默认静音
                     HStack {
                         VStack(alignment: .leading, spacing: 3) {
@@ -1593,92 +1686,22 @@ public struct SettingsView: View {
 
     private var pureShelfSettingsContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Pure Shelf")
-                .font(.system(size: 26, weight: .bold))
-                .foregroundStyle(.primary)
-
-            // Centered Live Pure Shelf Preview (Adaptive Day/Night Theme)
-            VStack {
-                // Outer window frame of Pure Shelf
-                VStack(spacing: 0) {
-                    // Titlebar of Pure Shelf
-                    HStack(spacing: 8) {
-                        PureZipLogoSymbolView(size: 18)
-                        Text("PureZip")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary)
-
-                        Text("Pure Shelf")
-                            .font(.system(size: 9, weight: .medium))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1.5)
-                            .background(colorScheme == .dark ? Color(white: 0.22) : Color.white.opacity(0.85))
-                            .clipShape(Capsule())
-                            .foregroundStyle(.primary)
-
-                        Spacer()
-
-                        // Pin button
-                        Image(systemName: "pin.fill")
-                            .font(.system(size: 9))
-                            .foregroundStyle(Color(red: 0.88, green: 0.60, blue: 0.05))
-                            .frame(width: 20, height: 20)
-                            .background(colorScheme == .dark ? Color(white: 0.22) : Color.white)
-                            .clipShape(Circle())
-
-                        // Close button
-                        Image(systemName: "xmark")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 20, height: 20)
-                            .background(colorScheme == .dark ? Color(white: 0.22) : Color.white)
-                            .clipShape(Circle())
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(colorScheme == .dark ? Color(white: 0.12) : Color(white: 0.98))
-
-                    // Pure Shelf Body Area
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(colorScheme == .dark ? Color(white: 0.16) : Color(white: 0.93))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06), lineWidth: 1)
-                            )
-
-                        // Hollow Inbox Icon with Down Arrow
-                        VStack(spacing: 6) {
-                            Image(systemName: "tray.and.arrow.down")
-                                .font(.system(size: 46, weight: .light))
-                                .foregroundStyle(colorScheme == .dark ? Color(white: 0.40) : Color(white: 0.62))
-                            Text("可从访达拖入文件暂存")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(8)
-                    .frame(height: 160)
-                }
-                .frame(width: 260)
-                .background(colorScheme == .dark ? Color(white: 0.12) : Color(white: 0.98))
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18)
-                        .stroke(colorScheme == .dark ? Color.white.opacity(0.15) : Color.black.opacity(0.08), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.35 : 0.08), radius: 10, x: 0, y: 4)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Pure Shelf 菜单栏中转站")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(.primary)
+                Text("位于屏幕右上角的文件暂存与长距离拖拽中继岛，支持多来源素材收集、向外拖出中继与一键打包。")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
 
-            // 第一部分：Pure Shelf 菜单栏托盘
+            // 第一部分：暂存与拖出中继
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
-                    Image(systemName: "menubar.rectangle")
+                    Image(systemName: "hand.draw")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color(red: 0.05, green: 0.48, blue: 0.98))
-                    Text("Pure Shelf 菜单栏托盘")
+                    Text("暂存与拖出中继")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -1689,7 +1712,7 @@ public struct SettingsView: View {
                             Text("启用菜单栏托盘")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(.primary)
-                            Text("在屏幕右上角常驻菜单栏图标，支持随时随地向托盘拖入文件。")
+                            Text("在屏幕右上角常驻图标，支持随时随地向托盘拖入文件。")
                                 .font(.system(size: 12))
                                 .foregroundStyle(Color(white: 0.55))
                         }
@@ -1704,38 +1727,19 @@ public struct SettingsView: View {
 
                     HStack {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("默认打包格式")
+                            Text("从暂存盒向外拖出文件后")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(.primary)
-                            Text("从菜单栏托盘一键打包时所采用的归档格式。")
+                            Text("长距离拖拽中继时，文件被拖出到目标文件夹或应用后的行为。")
                                 .font(.system(size: 12))
                                 .foregroundStyle(Color(white: 0.55))
                         }
                         Spacer()
-                        Picker("", selection: $model.pureShelfDefaultFormat) {
-                            Text("ZIP 格式 (.zip)").tag("zip")
-                            Text("7-Zip 格式 (.7z)").tag("7z")
-                            Text("Tarball 格式 (.tar.gz)").tag("tar.gz")
+                        Picker("", selection: $model.pureShelfRemoveOnDragOut) {
+                            Text("自动从暂存盒移出（推荐）").tag(true)
+                            Text("继续保留在盒中").tag(false)
                         }
-                        .frame(width: 160)
-                    }
-                    .padding(16)
-                    .background(Color(NSColor.controlBackgroundColor))
-
-                    Divider()
-
-                    HStack {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("打包后自动清空")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.primary)
-                            Text("归档文件创建成功后，自动从托盘中移除已暂存的项目。")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Color(white: 0.55))
-                        }
-                        Spacer()
-                        Toggle("", isOn: $model.pureShelfAutoClearAfterPackaging)
-                            .toggleStyle(SwitchToggleStyle(tint: Color(red: 0.05, green: 0.48, blue: 0.98)))
+                        .frame(width: 190)
                     }
                     .padding(16)
                     .background(Color(NSColor.controlBackgroundColor))
@@ -1747,7 +1751,7 @@ public struct SettingsView: View {
                             Text("保持托盘浮窗置顶")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(.primary)
-                            Text("打开托盘时默认固定图钉，切换到其他应用时不自动关闭。")
+                            Text("打开托盘时默认固定图钉，切换到其他应用时不自动关闭，方便跨窗口长距离中继。")
                                 .font(.system(size: 12))
                                 .foregroundStyle(Color(white: 0.55))
                         }
@@ -1779,13 +1783,13 @@ public struct SettingsView: View {
                 .cornerRadius(10)
             }
 
-            // 第二部分：Pure Shelf 主窗口
+            // 第二部分：归档与打包
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
-                    Image(systemName: "macwindow")
+                    Image(systemName: "archivebox")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color(red: 0.05, green: 0.48, blue: 0.98))
-                    Text("Pure Shelf 主窗口")
+                    Text("归档与打包")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -1793,16 +1797,20 @@ public struct SettingsView: View {
                 VStack(spacing: 1) {
                     HStack {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("未打开归档时作为主工作台")
+                            Text("默认打包格式")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(.primary)
-                            Text("启动应用或关闭归档后，主窗口展示暂存起航台，支持拖放收集与新建。")
+                            Text("从暂存盒一键打包时所采用的归档格式。")
                                 .font(.system(size: 12))
                                 .foregroundStyle(Color(white: 0.55))
                         }
                         Spacer()
-                        Toggle("", isOn: $model.pureShelfMainWindowEnabled)
-                            .toggleStyle(SwitchToggleStyle(tint: Color(red: 0.05, green: 0.48, blue: 0.98)))
+                        Picker("", selection: $model.pureShelfDefaultFormat) {
+                            Text("ZIP 格式 (.zip)").tag("zip")
+                            Text("7-Zip 格式 (.7z)").tag("7z")
+                            Text("Tarball 格式 (.tar.gz)").tag("tar.gz")
+                        }
+                        .frame(width: 160)
                     }
                     .padding(16)
                     .background(Color(NSColor.controlBackgroundColor))
@@ -1811,19 +1819,16 @@ public struct SettingsView: View {
 
                     HStack {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("主窗口文件拖入动作")
+                            Text("打包后自动清空")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(.primary)
-                            Text("向主窗口拖入非压缩包文件时的默认处理方式。")
+                            Text("归档文件创建成功后，自动从托盘中清空已暂存的项目。")
                                 .font(.system(size: 12))
                                 .foregroundStyle(Color(white: 0.55))
                         }
                         Spacer()
-                        Picker("", selection: $model.pureShelfMainWindowDropAction) {
-                            Text("加入 Pure Shelf 等待打包").tag("stageInShelf")
-                            Text("直接弹出新建归档").tag("createNewArchive")
-                        }
-                        .frame(width: 160)
+                        Toggle("", isOn: $model.pureShelfAutoClearAfterPackaging)
+                            .toggleStyle(SwitchToggleStyle(tint: Color(red: 0.05, green: 0.48, blue: 0.98)))
                     }
                     .padding(16)
                     .background(Color(NSColor.controlBackgroundColor))

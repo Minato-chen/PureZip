@@ -49,6 +49,8 @@ public final class PureZipPreferences: ObservableObject {
         static let capsuleWindowAllowEditing    = "PureZip.PureCapsule.AllowEditing"
 
         static let deskVideoAutoPlay              = "PureZip.PureDesk.VideoAutoPlay"
+        static let deskAudioAutoPlay              = "PureZip.PureDesk.AudioAutoPlay"
+        static let deskAudioLoop                  = "PureZip.PureDesk.AudioLoop"
         static let deskMediaAlwaysMute            = "PureZip.PureDesk.MediaAlwaysMute"
         static let deskUnsavedChangesAction       = "PureZip.PureDesk.UnsavedChangesAction"
         static let deskDuplicateNamingAction      = "PureZip.PureDesk.DuplicateNamingAction"
@@ -58,6 +60,7 @@ public final class PureZipPreferences: ObservableObject {
         static let pureShelfColorIndex          = "PureZip.PureShelf.ColorIndex"
         static let pureShelfColorIntensity      = "PureZip.PureShelf.ColorIntensity"
         static let pureShelfAutoClear           = "PureZip.PureShelf.AutoClearAfterPackaging"
+        static let pureShelfRemoveOnDragOut     = "PureZip.PureShelf.RemoveOnDragOut"
         static let pureShelfDefaultFormat       = "PureZip.PureShelf.DefaultFormat"
         static let pureShelfKeepPinned          = "PureZip.PureShelf.KeepWindowPinned"
         static let pureShelfShowBadge           = "PureZip.PureShelf.ShowCountBadge"
@@ -198,6 +201,14 @@ public final class PureZipPreferences: ObservableObject {
         didSet { defaults.set(deskVideoAutoPlay, forKey: Key.deskVideoAutoPlay) }
     }
 
+    @Published public var deskAudioAutoPlay: Bool {
+        didSet { defaults.set(deskAudioAutoPlay, forKey: Key.deskAudioAutoPlay) }
+    }
+
+    @Published public var deskAudioLoop: Bool {
+        didSet { defaults.set(deskAudioLoop, forKey: Key.deskAudioLoop) }
+    }
+
     @Published public var deskMediaAlwaysMute: Bool {
         didSet { defaults.set(deskMediaAlwaysMute, forKey: Key.deskMediaAlwaysMute) }
     }
@@ -238,6 +249,10 @@ public final class PureZipPreferences: ObservableObject {
 
     @Published public var pureShelfAutoClearAfterPackaging: Bool {
         didSet { defaults.set(pureShelfAutoClearAfterPackaging, forKey: Key.pureShelfAutoClear) }
+    }
+
+    @Published public var pureShelfRemoveOnDragOut: Bool {
+        didSet { defaults.set(pureShelfRemoveOnDragOut, forKey: Key.pureShelfRemoveOnDragOut) }
     }
 
     @Published public var pureShelfDefaultFormat: String {
@@ -326,7 +341,16 @@ public final class PureZipPreferences: ObservableObject {
         self.capsuleWindowAllowEditing = defaults.object(forKey: Key.capsuleWindowAllowEditing) as? Bool ?? false
 
         // 5.5. Pure Desk
-        self.deskVideoAutoPlay = defaults.object(forKey: Key.deskVideoAutoPlay) as? Bool ?? true
+        let hasMigratedAutoPlay = defaults.bool(forKey: "PureZip.PureDesk.MigratedVideoAutoPlayDefault_v2")
+        if !hasMigratedAutoPlay {
+            defaults.set(false, forKey: Key.deskVideoAutoPlay)
+            defaults.set(true, forKey: "PureZip.PureDesk.MigratedVideoAutoPlayDefault_v2")
+            self.deskVideoAutoPlay = false
+        } else {
+            self.deskVideoAutoPlay = defaults.object(forKey: Key.deskVideoAutoPlay) as? Bool ?? false
+        }
+        self.deskAudioAutoPlay = defaults.object(forKey: Key.deskAudioAutoPlay) as? Bool ?? false
+        self.deskAudioLoop = defaults.object(forKey: Key.deskAudioLoop) as? Bool ?? false
         self.deskMediaAlwaysMute = defaults.object(forKey: Key.deskMediaAlwaysMute) as? Bool ?? true
         self.deskUnsavedChangesAction = defaults.string(forKey: Key.deskUnsavedChangesAction) ?? "ask"
         self.deskDuplicateNamingAction = defaults.string(forKey: Key.deskDuplicateNamingAction) ?? "autoRename"
@@ -338,6 +362,7 @@ public final class PureZipPreferences: ObservableObject {
         let intensity = defaults.double(forKey: Key.pureShelfColorIntensity)
         self.pureShelfColorIntensity = intensity > 0 ? intensity : 35.0
         self.pureShelfAutoClearAfterPackaging = defaults.object(forKey: Key.pureShelfAutoClear) as? Bool ?? true
+        self.pureShelfRemoveOnDragOut = defaults.object(forKey: Key.pureShelfRemoveOnDragOut) as? Bool ?? true
         self.pureShelfDefaultFormat = defaults.string(forKey: Key.pureShelfDefaultFormat) ?? "zip"
         self.pureShelfKeepWindowPinned = defaults.object(forKey: Key.pureShelfKeepPinned) as? Bool ?? false
         self.pureShelfShowCountBadge = defaults.object(forKey: Key.pureShelfShowBadge) as? Bool ?? true
@@ -440,6 +465,22 @@ public final class PureZipPreferences: ObservableObject {
         return nil
         #endif
     }
+
+    #if canImport(AppKit)
+    /// 获取明确解析后的 NSAppearance（避免在状态栏菜单或浮层等跟随 sender 时错误继承菜单栏深色材质）
+    public var resolvedNSAppearance: NSAppearance {
+        switch appearanceMode {
+        case "light":
+            return NSAppearance(named: .aqua) ?? NSAppearance(named: .vibrantLight)!
+        case "dark":
+            return NSAppearance(named: .darkAqua) ?? NSAppearance(named: .vibrantDark)!
+        default:
+            return Self.systemIsDark ?
+                (NSAppearance(named: .darkAqua) ?? NSAppearance(named: .vibrantDark)!) :
+                (NSAppearance(named: .aqua) ?? NSAppearance(named: .vibrantLight)!)
+        }
+    }
+    #endif
 
     /// 监听系统外观变化（仅注册一次），在“跟随系统”模式下刷新 SwiftUI 视图
     private func observeSystemAppearanceIfNeeded() {
@@ -591,6 +632,7 @@ public final class PureZipPreferences: ObservableObject {
         pureShelfColorIndex = 0
         pureShelfColorIntensity = 35.0
         pureShelfAutoClearAfterPackaging = true
+        pureShelfRemoveOnDragOut = true
         pureShelfDefaultFormat = "zip"
         pureShelfKeepWindowPinned = false
         pureShelfShowCountBadge = true
@@ -598,6 +640,10 @@ public final class PureZipPreferences: ObservableObject {
         pureShelfMainWindowDropAction = "stageInShelf"
 
         // Note: Association in LaunchServices/Finder is preserved on preferences reset
+        deskVideoAutoPlay = false
+        deskAudioAutoPlay = false
+        deskAudioLoop = false
+        deskMediaAlwaysMute = true
         autoCheckUpdates = true
         updateStatusText = "尚未检查更新"
 

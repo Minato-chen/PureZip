@@ -31,6 +31,24 @@ public final class ArchiveCreationViewModel: ObservableObject {
     @Published public var customizedFilenames: [UUID: String] = [:]
     @Published public var isShowingCompatibilitySheet: Bool = false
 
+    // Smart Media Detection
+    @Published public var isMediaDominated: Bool = false
+    @Published public var detectedMediaCount: Int = 0
+    @Published public var detectedTotalCount: Int = 0
+
+    // Creation In-Progress State
+    @Published public var isCreating: Bool = false
+    @Published public var creationProgress: Double = 0.0
+    @Published public var currentProcessingFile: String = ""
+    @Published public var processedBytes: Int64 = 0
+    @Published public var totalBytes: Int64 = 0
+    @Published public var transferSpeedMBs: Double = 0.0
+    @Published public var estimatedRemainingSeconds: Double? = nil
+    @Published public var creationError: String? = nil
+
+    public var creationStartTime: Date? = nil
+    public var creationTask: Task<Void, Never>? = nil
+
     public init(sources: [URL]) {
         self.sources = sources
         self.destinationDirectory = sources.first?.deletingLastPathComponent() ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first ?? FileManager.default.homeDirectoryForCurrentUser
@@ -42,14 +60,78 @@ public final class ArchiveCreationViewModel: ObservableObject {
         if PureZipPreferences.shared.defaultCreateSplitVolumes {
             self.selectedVolumeSize = .mb100
         }
+        detectMediaContent()
         applyPurposePreset(defaultPurpose)
         runCompatibilityCheck()
+    }
+
+    private func detectMediaContent() {
+        let mediaExtensions: Set<String> = [
+            "jpg", "jpeg", "png", "heic", "heif", "gif", "webp", "bmp", "tiff", "tif",
+            "cr2", "cr3", "arw", "nef", "dng", "raw", "raf", "orf", "rw2", "pef",
+            "mp4", "mov", "m4v", "avi", "mkv", "wmv", "flv", "webm",
+            "mp3", "flac", "wav", "aac", "m4a", "ogg", "wma", "aiff"
+        ]
+        var mediaCount = 0
+        var totalCount = 0
+        var totalSize: Int64 = 0
+        let fm = FileManager.default
+
+        for url in sources {
+            var isDir: ObjCBool = false
+            if fm.fileExists(atPath: url.path, isDirectory: &isDir) {
+                if isDir.boolValue {
+                    if let enumerator = fm.enumerator(
+                        at: url,
+                        includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
+                        options: [.skipsHiddenFiles]
+                    ) {
+                        for case let fileURL as URL in enumerator {
+                            guard let vals = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+                                  vals.isRegularFile == true else { continue }
+                            totalCount += 1
+                            let sz = Int64(vals.fileSize ?? 0)
+                            totalSize += sz
+                            if mediaExtensions.contains(fileURL.pathExtension.lowercased()) {
+                                mediaCount += 1
+                            }
+                            if totalCount >= 800 { break }
+                        }
+                    }
+                } else {
+                    totalCount += 1
+                    if let vals = try? url.resourceValues(forKeys: [.fileSizeKey]) {
+                        totalSize += Int64(vals.fileSize ?? 0)
+                    }
+                    if mediaExtensions.contains(url.pathExtension.lowercased()) {
+                        mediaCount += 1
+                    }
+                }
+            }
+        }
+
+        self.detectedMediaCount = mediaCount
+        self.detectedTotalCount = totalCount
+        self.totalBytes = totalSize
+        if totalCount > 0 && Double(mediaCount) / Double(totalCount) >= 0.6 {
+            self.isMediaDominated = true
+            self.sliderStep = 0
+            self.compressionStrength = .store
+        }
+    }
+
+    public func cancelCreation() {
+        creationTask?.cancel()
+        creationTask = nil
+        isCreating = false
+        currentProcessingFile = ""
+        creationError = nil
     }
 
     public func applyPurposePreset(_ purpose: ArchiveCreationPurpose) {
         selectedPurpose = purpose
         selectedFormat = purpose.defaultFormat
-        let defaultLevel = PureZipPreferences.shared.compressionLevel
+        let defaultLevel = isMediaDominated ? 0 : PureZipPreferences.shared.compressionLevel
         switch purpose {
         case .general:
             selectedFormat = .zip
@@ -77,7 +159,9 @@ public final class ArchiveCreationViewModel: ObservableObject {
     public func updateStrengthFromStep(_ step: Int) {
         sliderStep = step
         switch step {
-        case 0, 1:
+        case 0:
+            compressionStrength = .store
+        case 1:
             compressionStrength = .fastest
         case 2:
             compressionStrength = .standard
@@ -139,27 +223,52 @@ public final class ArchiveCreationViewModel: ObservableObject {
 
     public var strengthDisplayName: String {
         switch sliderStep {
-        case 0: return "极速"
-        case 1: return "较快"
-        case 2: return "均衡"
+        case 0: return "极速仅存储 (推荐照片/视频)"
+        case 1: return "快速压缩"
+        case 2: return "均衡压缩"
         case 3: return "高压缩"
-        case 4: return "极限"
-        default: return "均衡"
+        case 4: return "极限压缩"
+        default: return "均衡压缩"
         }
     }
 }
 
 /// Interactive archive creation configuration dialog.
 public struct ArchiveCreationDialogView: View {
-    @ObservedObject var model: ArchiveCreationViewModel
+    @StateObject private var model: ArchiveCreationViewModel
     @ObservedObject var session: ArchiveBrowsingSession
 
     public init(sources: [URL], session: ArchiveBrowsingSession) {
-        self.model = ArchiveCreationViewModel(sources: sources)
+        _model = StateObject(wrappedValue: ArchiveCreationViewModel(sources: sources))
         self.session = session
     }
 
     public var body: some View {
+        Group {
+            if model.isCreating {
+                ArchiveCreationProgressView(model: model, session: session)
+            } else {
+                dialogContent
+            }
+        }
+        .frame(minWidth: 620, idealWidth: 660, maxWidth: 680, minHeight: 480, idealHeight: 560, maxHeight: 620)
+        .background(Color(NSColor.windowBackgroundColor))
+        .sheet(isPresented: $model.isShowingCompatibilitySheet) {
+            WindowsCompatibilityFixSheetView(
+                model: model,
+                onCancel: {
+                    model.isShowingCompatibilitySheet = false
+                },
+                onConfirm: {
+                    model.isShowingCompatibilitySheet = false
+                    let remappings = model.buildPathRemappings()
+                    startCreation(pathRemappings: remappings)
+                }
+            )
+        }
+    }
+
+    private var dialogContent: some View {
         VStack(spacing: 0) {
             // Fixed Header
             HStack(spacing: 8) {
@@ -195,6 +304,28 @@ public struct ArchiveCreationDialogView: View {
             // Scrollable Content Body
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(spacing: 16) {
+                    if model.isMediaDominated {
+                        HStack(spacing: 8) {
+                            Image(systemName: "bolt.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Color(red: 0.98, green: 0.55, blue: 0.05))
+
+                            Text("检测到含 \(model.detectedMediaCount) 个多媒体文件（本身已高度压缩），已推荐「极速仅存储」以实现秒级快速打包。")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.primary)
+
+                            Spacer()
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color(red: 0.98, green: 0.55, blue: 0.05).opacity(0.12))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color(red: 0.98, green: 0.55, blue: 0.05).opacity(0.25), lineWidth: 1)
+                        )
+                    }
+
                     // Top Inputs Row: [名称] & [存储位置]
                     HStack(spacing: 16) {
                 // Name Field
@@ -575,23 +706,8 @@ public struct ArchiveCreationDialogView: View {
     .padding(.horizontal, 22)
     .padding(.vertical, 14)
     .background(Color(NSColor.windowBackgroundColor))
-}
-.frame(minWidth: 620, idealWidth: 660, maxWidth: 680, minHeight: 480, idealHeight: 560, maxHeight: 620)
-.background(Color(NSColor.windowBackgroundColor))
-        .sheet(isPresented: $model.isShowingCompatibilitySheet) {
-            WindowsCompatibilityFixSheetView(
-                model: model,
-                onCancel: {
-                    model.isShowingCompatibilitySheet = false
-                },
-                onConfirm: {
-                    model.isShowingCompatibilitySheet = false
-                    let remappings = model.buildPathRemappings()
-                    startCreation(pathRemappings: remappings)
-                }
-            )
-        }
     }
+}
 
     private func purposeOverviewChecklist(for purpose: ArchiveCreationPurpose) -> [String] {
         switch purpose {
@@ -632,6 +748,7 @@ public struct ArchiveCreationDialogView: View {
     private func startCreation(pathRemappings: [String: String] = [:]) {
         let (rawStem, _) = ArchiveOutputFamily.splitArchiveStemAndCompoundExtension(model.archiveStem)
         let finalExt = model.selectedFormat == .sevenZip ? "7z" : model.selectedFormat.rawValue
+        try? FileManager.default.createDirectory(at: model.destinationDirectory, withIntermediateDirectories: true)
         let finalURL = model.destinationDirectory.appendingPathComponent("\(rawStem).\(finalExt)")
 
         let profile = CompressionProfile(
@@ -647,9 +764,13 @@ public struct ArchiveCreationDialogView: View {
         let sources = model.sources
         let purposeTitle = model.selectedPurpose.title
 
-        session.creationSources = nil
+        model.isCreating = true
+        model.creationProgress = 0.0
+        model.currentProcessingFile = "正在准备压缩..."
+        model.creationStartTime = Date()
+        model.creationError = nil
 
-        Task {
+        model.creationTask = Task {
             session.isBusy = true
             session.statusMessage = "正在按照「\(purposeTitle)」规范创建归档..."
             do {
@@ -662,23 +783,277 @@ public struct ArchiveCreationDialogView: View {
                         profile: profile
                     ) { prog in
                         Task { @MainActor in
-                            if let total = prog.total, total > 0 {
-                                session.progressFraction = Double(prog.completed) / Double(total)
+                            let pct = (prog.total != nil && prog.total! > 0) ? Double(prog.completed) / Double(prog.total!) : 0.0
+                            model.creationProgress = max(0.0, min(1.0, pct))
+                            if !prog.message.isEmpty {
+                                model.currentProcessingFile = prog.message
+                            }
+                            if let startTime = model.creationStartTime {
+                                let elapsed = Date().timeIntervalSince(startTime)
+                                if elapsed > 0.3 && pct > 0 {
+                                    let currentBytes = Int64(Double(model.totalBytes) * pct)
+                                    model.processedBytes = currentBytes
+                                    let speed = Double(currentBytes) / elapsed
+                                    model.transferSpeedMBs = max(0.1, speed / (1024 * 1024))
+                                    let remainingBytes = Double(max(0, model.totalBytes - currentBytes))
+                                    if speed > 0 {
+                                        model.estimatedRemainingSeconds = remainingBytes / speed
+                                    }
+                                }
                             }
                         }
                     }
                     let res = try await lease.commit()
-                    session.statusMessage = "归档创建成功: \(res.primaryURL.lastPathComponent)"
+                    await MainActor.run {
+                        model.creationProgress = 1.0
+                        model.currentProcessingFile = "压缩完成！"
+                    }
+                    try? await Task.sleep(nanoseconds: 350_000_000)
+                    await MainActor.run {
+                        session.creationSources = nil
+                        session.statusMessage = "归档创建成功: \(res.primaryURL.lastPathComponent)"
+                    }
                     await session.openArchive(at: res.primaryURL)
                 } catch {
                     await lease.rollbackAndWait()
                     throw error
                 }
+            } catch is CancellationError {
+                await MainActor.run {
+                    model.isCreating = false
+                    session.creationSources = nil
+                    session.statusMessage = "已取消压缩"
+                }
             } catch {
-                session.statusMessage = "创建归档失败: \(error.localizedDescription)"
+                await MainActor.run {
+                    model.creationError = error.localizedDescription
+                    session.statusMessage = "创建归档失败: \(error.localizedDescription)"
+                }
             }
             session.isBusy = false
             session.progressFraction = nil
+        }
+    }
+}
+
+// MARK: - Archive Creation Progress View
+
+public struct ArchiveCreationProgressView: View {
+    @ObservedObject var model: ArchiveCreationViewModel
+    @ObservedObject var session: ArchiveBrowsingSession
+
+    public var body: some View {
+        VStack(spacing: 20) {
+            // Header
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color(red: 0.85, green: 0.25, blue: 0.45), Color(red: 0.05, green: 0.48, blue: 0.98)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 24, height: 28)
+
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.white.opacity(0.85))
+                        .frame(width: 4, height: 18)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(model.creationProgress >= 1.0 ? "压缩完成" : "正在创建压缩包")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.primary)
+
+                    Text(model.archiveStem)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 28)
+            .padding(.top, 24)
+
+            Divider()
+
+            Spacer()
+
+            // Center Progress Section
+            VStack(spacing: 20) {
+                // Large circular progress ring
+                ZStack {
+                    Circle()
+                        .stroke(Color(NSColor.separatorColor).opacity(0.25), lineWidth: 8)
+                        .frame(width: 104, height: 104)
+
+                    Circle()
+                        .trim(from: 0.0, to: CGFloat(max(0.01, min(1.0, model.creationProgress))))
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color(red: 0.18, green: 0.48, blue: 0.98), Color(red: 0.05, green: 0.48, blue: 0.98)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+                        .frame(width: 104, height: 104)
+                        .animation(.linear(duration: 0.2), value: model.creationProgress)
+
+                    VStack(spacing: 2) {
+                        Text("\(Int(model.creationProgress * 100))%")
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundStyle(.primary)
+
+                        if model.transferSpeedMBs > 0 {
+                            Text(String(format: "%.1f MB/s", model.transferSpeedMBs))
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                // Progress Bar
+                ProgressView(value: model.creationProgress, total: 1.0)
+                    .progressViewStyle(.linear)
+                    .tint(Color(red: 0.05, green: 0.48, blue: 0.98))
+                    .frame(maxWidth: 420)
+
+                // Current file being processed
+                HStack(spacing: 6) {
+                    Image(systemName: "doc.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+
+                    Text(model.currentProcessingFile.isEmpty ? "正在准备数据..." : model.currentProcessingFile)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .frame(maxWidth: 440)
+
+                // Stats Dashboard: Speed, Size, Remaining Time
+                HStack(spacing: 28) {
+                    VStack(spacing: 3) {
+                        Text("已处理大小")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        Text(formatProcessedSize())
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.primary)
+                    }
+
+                    Divider()
+                        .frame(height: 24)
+
+                    VStack(spacing: 3) {
+                        Text("传输速度")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        Text(model.transferSpeedMBs > 0 ? String(format: "%.1f MB/s", model.transferSpeedMBs) : "--")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.primary)
+                    }
+
+                    Divider()
+                        .frame(height: 24)
+
+                    VStack(spacing: 3) {
+                        Text("预估剩余时间")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        Text(formatRemainingTime())
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.primary)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(Color(NSColor.controlBackgroundColor).opacity(0.6))
+                .cornerRadius(10)
+
+                // Error message if any
+                if let errorMsg = model.creationError {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
+                        Text("创建失败: \(errorMsg)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.red)
+                    }
+                    .padding(10)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
+                }
+            }
+
+            Spacer()
+
+            Divider()
+
+            // Footer Cancel / Dismiss Button
+            HStack {
+                Spacer()
+
+                if model.creationError != nil {
+                    Button("关闭") {
+                        model.isCreating = false
+                        session.creationSources = nil
+                    }
+                    .buttonStyle(.borderedProminent)
+                } else if model.creationProgress < 1.0 {
+                    Button {
+                        model.cancelCreation()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 11, weight: .bold))
+                            Text("取消创建")
+                                .font(.system(size: 13, weight: .medium))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 8)
+                        .background(Color(red: 0.85, green: 0.22, blue: 0.26))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Text("即将完成...")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 14)
+            .background(Color(NSColor.windowBackgroundColor))
+        }
+    }
+
+    private func formatProcessedSize() -> String {
+        let processed = ByteCountFormatter.string(fromByteCount: model.processedBytes, countStyle: .file)
+        if model.totalBytes > 0 {
+            let total = ByteCountFormatter.string(fromByteCount: model.totalBytes, countStyle: .file)
+            return "\(processed) / \(total)"
+        }
+        return processed
+    }
+
+    private func formatRemainingTime() -> String {
+        guard let remaining = model.estimatedRemainingSeconds, remaining.isFinite, remaining > 0 else {
+            return "计算中..."
+        }
+        if remaining < 60 {
+            return "约 \(max(1, Int(remaining))) 秒"
+        } else {
+            let mins = Int(remaining) / 60
+            let secs = Int(remaining) % 60
+            return "约 \(mins) 分 \(secs) 秒"
         }
     }
 }

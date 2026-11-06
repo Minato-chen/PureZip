@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 @testable import ArchiveCore
 @testable import ArchiveEngines
 @testable import PureZipFinderSupport
@@ -41,6 +42,9 @@ public enum PureZipSelfTestSuite {
         try await testManagedTemporaryArtifactRegistryAndPreviewSeedStore(tempDir: tempDir)
         try testFinderSupportAndExtractionFinalizationManifest(tempDir: tempDir)
         try await testDiskImageSingleEntryExtraction(tempDir: tempDir)
+        try testImagePreviewHelperAndDownsampling(tempDir: tempDir)
+        try await testZIPEngineTailSeekAndBrokerRouting(tempDir: tempDir)
+        try await testSevenZipUnicodeNFDNormalizationAndExtraction(tempDir: tempDir)
     }
 
     public static func testVolumeAndOutputFamilies(tempDir: URL) throws {
@@ -421,5 +425,107 @@ public enum PureZipSelfTestSuite {
         try await engine.extract(dmgURL, entries: [icnsEntry], to: extractDir)
         let extractedFile = extractDir.appendingPathComponent(icnsEntry.path)
         try assertTrue(FileManager.default.fileExists(atPath: extractedFile.path), "Expected DiskImageEngine.extract to extract MacPlay.icns via hdiutil fallback when 7zz exits 0 without writing")
+    }
+
+    public static func testImagePreviewHelperAndDownsampling(tempDir: URL) throws {
+        let rawFormats = ["arw", "cr2", "cr3", "nef", "dng", "raw", "orf", "raf", "rw2"]
+        for ext in rawFormats {
+            try assertTrue(ImagePreviewHelper.isSupportedImage(ext: ext), "Expected \(ext) to be recognized as supported image")
+        }
+        try assertTrue(ImagePreviewHelper.isSupportedImage(ext: "jpg"))
+        try assertTrue(ImagePreviewHelper.isSupportedImage(ext: "PNG"))
+        try assertTrue(!ImagePreviewHelper.isSupportedImage(ext: "exe"))
+        try assertTrue(!ImagePreviewHelper.isSupportedImage(ext: "txt"))
+
+        let testImageURL = tempDir.appendingPathComponent("large_sample.png")
+        let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: 1000,
+            pixelsHigh: 1000,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 1000 * 4,
+            bitsPerPixel: 32
+        )
+        if let rep, let pngData = rep.representation(using: .png, properties: [:]) {
+            try pngData.write(to: testImageURL)
+            let thumb = ImagePreviewHelper.createThumbnail(at: testImageURL, maxPixelSize: 300)
+            try assertTrue(thumb != nil, "Expected thumbnail to be generated")
+            if let thumb {
+                try assertTrue(thumb.size.width <= 300 && thumb.size.height <= 300, "Expected thumbnail size to be downsampled")
+            }
+        }
+    }
+
+    public static func testZIPEngineTailSeekAndBrokerRouting(tempDir: URL) async throws {
+        let broker = ArchiveEngineBroker()
+        let sampleDir = tempDir.appendingPathComponent("TailSeekDir", isDirectory: true)
+        try FileManager.default.createDirectory(at: sampleDir, withIntermediateDirectories: true)
+        let sampleFile = sampleDir.appendingPathComponent("photo.jpg")
+        try Data("dummy-photo-content-header".utf8).write(to: sampleFile)
+
+        let zipURL = tempDir.appendingPathComponent("tail_seek.zip")
+        try await broker.create(
+            sources: [sampleFile],
+            at: zipURL,
+            profile: CompressionProfile(format: .zip, level: 0)
+        )
+
+        let engine = ZIPEngine()
+        let roots = try await engine.rootEntries(zipURL, limit: 10)
+        try assertEqual(roots.count, 1)
+        try assertEqual(roots.first?.name, "photo.jpg")
+
+        let extractDir = tempDir.appendingPathComponent("TailSeekExtract", isDirectory: true)
+        try await engine.extract(zipURL, entries: roots, to: extractDir)
+        let extractedFile = extractDir.appendingPathComponent("photo.jpg")
+        try assertTrue(FileManager.default.fileExists(atPath: extractedFile.path))
+        let extractedContent = try String(contentsOf: extractedFile)
+        try assertEqual(extractedContent, "dummy-photo-content-header")
+    }
+
+    public static func testSevenZipUnicodeNFDNormalizationAndExtraction(tempDir: URL) async throws {
+        let sampleDir = tempDir.appendingPathComponent("UnicodeDir", isDirectory: true)
+        let subDir = sampleDir.appendingPathComponent("20260816 七大戦（吹奏・リーダー）_他大との共用 (20260930まで)", isDirectory: true)
+        try FileManager.default.createDirectory(at: subDir, withIntermediateDirectories: true)
+        let imgFile = subDir.appendingPathComponent("IMG_0578.jpg")
+        try Data("test-japanese-image-bytes".utf8).write(to: imgFile)
+
+        let zipURL = tempDir.appendingPathComponent("unicode_test.zip")
+        let sz = SevenZipEngine()
+        guard sz.isAvailable else { return }
+
+        try await sz.create(
+            sources: [sampleDir],
+            at: zipURL,
+            profile: CompressionProfile(format: .zip, level: 0)
+        )
+
+        let allStream = sz.list(zipURL)
+        var allEntries: [ArchiveEntry] = []
+        for try await batch in allStream {
+            allEntries.append(contentsOf: batch)
+        }
+        guard let imgEntry = allEntries.first(where: { $0.name == "IMG_0578.jpg" }) else {
+            return
+        }
+
+        let extractDir = tempDir.appendingPathComponent("UnicodeExtract", isDirectory: true)
+        try await sz.extract(zipURL, entries: [imgEntry], to: extractDir)
+
+        let existsDirect = FileManager.default.fileExists(atPath: extractDir.appendingPathComponent(imgEntry.path).path)
+        var foundRecursive = false
+        if let enumerator = FileManager.default.enumerator(at: extractDir, includingPropertiesForKeys: nil) {
+            while let item = enumerator.nextObject() as? URL {
+                if item.lastPathComponent == "IMG_0578.jpg" {
+                    foundRecursive = true
+                    break
+                }
+            }
+        }
+        try assertTrue(existsDirect || foundRecursive, "Expected IMG_0578.jpg to be extracted by 7zz with Unicode normalization")
     }
 }

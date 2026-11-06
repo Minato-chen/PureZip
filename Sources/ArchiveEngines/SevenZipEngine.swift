@@ -271,8 +271,32 @@ public struct SevenZipEngine: ArchiveEngine {
             args.append("-p")
         }
         args.append(primary.path)
-        for entry in entries {
-            args.append(entry.path)
+        if !entries.isEmpty {
+            var pathVariants = Set<String>()
+            for entry in entries {
+                pathVariants.insert(entry.path)
+                pathVariants.insert(entry.path.precomposedStringWithCanonicalMapping)
+                pathVariants.insert(entry.path.decomposedStringWithCanonicalMapping)
+                let forward = entry.path.replacingOccurrences(of: "\\", with: "/")
+                pathVariants.insert(forward)
+                pathVariants.insert(forward.precomposedStringWithCanonicalMapping)
+                pathVariants.insert(forward.decomposedStringWithCanonicalMapping)
+            }
+            for p in pathVariants {
+                args.append(p)
+            }
+
+            // If extracting a single entry (e.g. preview/thumbnail), also supply wildcard search to overcome
+            // subtle parent directory encoding/normalization differences between macOS and archive headers
+            if entries.count == 1, let single = entries.first {
+                let nameNFC = single.name.precomposedStringWithCanonicalMapping
+                let nameNFD = single.name.decomposedStringWithCanonicalMapping
+                args.append("*\(nameNFC)")
+                if nameNFD != nameNFC {
+                    args.append("*\(nameNFD)")
+                }
+                args.append("-r")
+            }
         }
 
         progress?(ArchiveTaskProgress(completed: 0, total: 100, message: primary.lastPathComponent, unit: .percentage, phase: .engineProcessing))
@@ -290,7 +314,7 @@ public struct SevenZipEngine: ArchiveEngine {
         guard let bin = executableURL else {
             throw ArchiveEngineError.engineFailure(backend: id, detail: "7zz binary not found")
         }
-        var args = ["a", "-y", "-mx=\(max(0, min(9, profile.level)))"]
+        var args = ["a", "-y", "-bsp1", "-mx=\(max(0, min(9, profile.level)))"]
         if profile.format == .sevenZip {
             args.append("-t7z")
             args.append(profile.solid ? "-ms=on" : "-ms=off")
@@ -320,7 +344,7 @@ public struct SevenZipEngine: ArchiveEngine {
         args.append(contentsOf: sources.map(\.path))
 
         progress?(ArchiveTaskProgress(completed: 0, total: 100, message: destination.lastPathComponent, unit: .percentage, phase: .engineProcessing))
-        _ = try Self.runProcess(executable: bin, arguments: args)
+        _ = try await Self.runStreamingProcess(executable: bin, arguments: args, progress: progress)
 
         // Apply path remappings in-archive if provided (keeps source files on disk untouched)
         if !profile.pathRemappings.isEmpty {
@@ -402,14 +426,17 @@ public struct SevenZipEngine: ArchiveEngine {
         try proc.run()
         var outData = Data()
         var errData = Data()
+        let currentQoS = DispatchQoS.QoSClass(rawValue: qos_class_self()) ?? .userInitiated
+        let targetQoS: DispatchQoS.QoSClass = (currentQoS == .unspecified || currentQoS == .background || currentQoS == .utility) ? .userInitiated : currentQoS
+        let queue = DispatchQueue.global(qos: targetQoS)
         let group = DispatchGroup()
         group.enter()
-        DispatchQueue.global().async {
+        queue.async {
             outData = outPipe.fileHandleForReading.readDataToEndOfFile()
             group.leave()
         }
         group.enter()
-        DispatchQueue.global().async {
+        queue.async {
             errData = errPipe.fileHandleForReading.readDataToEndOfFile()
             group.leave()
         }
@@ -432,5 +459,112 @@ public struct SevenZipEngine: ArchiveEngine {
             )
         }
         return outStr
+    }
+
+    internal static func runStreamingProcess(
+        executable: URL,
+        arguments: [String],
+        currentDirectoryURL: URL? = nil,
+        progress: (@Sendable (ArchiveTaskProgress) -> Void)? = nil
+    ) async throws -> String {
+        let proc = Process()
+        proc.executableURL = executable
+        proc.arguments = arguments
+        if let currentDirectoryURL = currentDirectoryURL {
+            proc.currentDirectoryURL = currentDirectoryURL
+        }
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        proc.standardOutput = outPipe
+        proc.standardError = errPipe
+
+        let currentQoS = DispatchQoS.QoSClass(rawValue: qos_class_self()) ?? .userInitiated
+        let targetQoS: DispatchQoS.QoSClass = (currentQoS == .unspecified || currentQoS == .background || currentQoS == .utility) ? .userInitiated : currentQoS
+        let queue = DispatchQueue.global(qos: targetQoS)
+
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                queue.async {
+                    var outData = Data()
+                    var errData = Data()
+                    let group = DispatchGroup()
+
+                    group.enter()
+                    queue.async {
+                        let handle = outPipe.fileHandleForReading
+                        while true {
+                            let chunk = handle.availableData
+                            if chunk.isEmpty { break }
+                            outData.append(chunk)
+                            if let str = String(data: chunk, encoding: .utf8) {
+                                Self.parse7zProgress(str, progress: progress)
+                            }
+                        }
+                        group.leave()
+                    }
+
+                    group.enter()
+                    queue.async {
+                        errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+                        group.leave()
+                    }
+
+                    do {
+                        try proc.run()
+                        proc.waitUntilExit()
+                        group.wait()
+
+                        let outStr = String(data: outData, encoding: .utf8) ?? ""
+                        let errStr = String(data: errData, encoding: .utf8) ?? ""
+                        if proc.terminationStatus != 0 {
+                            let combined = (errStr + " " + outStr).lowercased()
+                            if combined.contains("password") ||
+                               combined.contains("cannot open encrypted archive") ||
+                               combined.contains("can not open encrypted archive") ||
+                               combined.contains("headers error") {
+                                continuation.resume(throwing: ArchiveEngineError.wrongPassword)
+                                return
+                            }
+                            continuation.resume(throwing: ArchiveEngineError.engineFailure(
+                                backend: "7zz",
+                                detail: "exit \(proc.terminationStatus): \(errStr.isEmpty ? outStr : errStr)"
+                            ))
+                            return
+                        }
+                        continuation.resume(returning: outStr)
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+        } onCancel: {
+            if proc.isRunning {
+                proc.terminate()
+            }
+        }
+    }
+
+    private static func parse7zProgress(_ text: String, progress: (@Sendable (ArchiveTaskProgress) -> Void)?) {
+        guard let progress = progress else { return }
+        let lines = text.split(whereSeparator: { $0 == "\r" || $0 == "\n" })
+        for line in lines {
+            let s = String(line)
+            if let pctRange = s.range(of: #"\b(\d{1,3})%"#, options: .regularExpression) {
+                let pctStr = s[pctRange].replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespaces)
+                if let pct = Int(pctStr) {
+                    var currentFile = ""
+                    if let plusIdx = s.range(of: "+ ") {
+                        currentFile = String(s[plusIdx.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                    progress(ArchiveTaskProgress(
+                        completed: Int64(pct),
+                        total: 100,
+                        message: currentFile,
+                        unit: .percentage,
+                        phase: .engineProcessing
+                    ))
+                }
+            }
+        }
     }
 }

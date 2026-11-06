@@ -55,6 +55,23 @@ public actor ArchiveEngineBroker {
         let isSplit = ArchiveVolumeFamily.isSplitArchive(at: url)
         let required = isSplit ? capabilities.union([.splitVolumes]) : capabilities
 
+        let isExternalOrLarge: Bool = {
+            if primary.path.hasPrefix("/Volumes/") && !primary.path.hasPrefix("/Volumes/Macintosh HD") {
+                return true
+            }
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: primary.path),
+               let size = attrs[.size] as? Int64, size > (200 * 1024 * 1024) {
+                return true
+            }
+            return false
+        }()
+
+        if isExternalOrLarge, let sz = engines.first(where: { $0.id == "sevenZip" }) as? SevenZipEngine, sz.isAvailable {
+            if sz.capabilities(for: desc.format).isSuperset(of: required) {
+                return sz
+            }
+        }
+
         // Prefer native ZIPEngine for single-volume standard ZIP archives
         if desc.format == .zip && !isSplit && !required.contains(.encrypt) {
             if let zipEng = engines.first(where: { $0.id == "zip" }),
@@ -95,14 +112,29 @@ public actor ArchiveEngineBroker {
         } else {
             fmt = try await descriptor(for: primary).format
         }
-        if fmt == .zip && !ArchiveVolumeFamily.isSplitArchive(at: url) {
-            return try await ZIPEngine().rootEntries(primary, limit: limit)
+
+        let isExternalOrLarge: Bool = {
+            if primary.path.hasPrefix("/Volumes/") && !primary.path.hasPrefix("/Volumes/Macintosh HD") {
+                return true
+            }
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: primary.path),
+               let size = attrs[.size] as? Int64, size > (200 * 1024 * 1024) {
+                return true
+            }
+            return false
+        }()
+
+        if fmt == .zip && !ArchiveVolumeFamily.isSplitArchive(at: url) && !isExternalOrLarge {
+            if let roots = try? await ZIPEngine().rootEntries(primary, limit: limit), !roots.isEmpty {
+                return roots
+            }
         }
 
         let eng = try await engine(for: primary, requiring: [.list])
         var all: [ArchiveEntry] = []
         for try await batch in eng.list(primary, password: nil) {
             all.append(contentsOf: batch)
+            if all.count >= (limit * 4) { break }
         }
         let roots = ArchiveBrowserProjection.directChildren(of: all, in: "", includeAuxiliary: false)
         return Array(roots.prefix(limit))
@@ -121,8 +153,33 @@ public actor ArchiveEngineBroker {
                 commentHandler(comment)
             }
         }
-        let eng = try await engine(for: primary, requiring: [.list])
-        return eng.list(primary, password: password)
+        let primaryEng = try await engine(for: primary, requiring: [.list])
+        let fallbackEng = (primaryEng.id != "sevenZip") ? (engines.first(where: { $0.id == "sevenZip" }) as? SevenZipEngine) : nil
+
+        return AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    for try await batch in primaryEng.list(primary, password: password) {
+                        continuation.yield(batch)
+                    }
+                    continuation.finish()
+                } catch {
+                    if let sz = fallbackEng, sz.isAvailable, sz.capabilities(for: desc.format).contains(.list) {
+                        do {
+                            for try await batch in sz.list(primary, password: password) {
+                                continuation.yield(batch)
+                            }
+                            continuation.finish()
+                            return
+                        } catch {
+                            continuation.finish(throwing: error)
+                            return
+                        }
+                    }
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
     }
 
     public func extract(
@@ -136,8 +193,20 @@ public actor ArchiveEngineBroker {
         progress: (@Sendable (ArchiveTaskProgress) -> Void)? = nil
     ) async throws {
         let primary = ArchiveVolumeFamily.primaryURL(for: url)
-        let eng = try await engine(for: primary, requiring: [.extract])
-        try await eng.extract(primary, entries: entries, to: destination, password: password, progress: progress)
+        let primaryEng = try await engine(for: primary, requiring: [.extract])
+        do {
+            try await primaryEng.extract(primary, entries: entries, to: destination, password: password, progress: progress)
+        } catch {
+            let desc = try await descriptor(for: primary)
+            if primaryEng.id != "sevenZip",
+               let sz = engines.first(where: { $0.id == "sevenZip" }) as? SevenZipEngine,
+               sz.isAvailable,
+               sz.capabilities(for: desc.format).contains(.extract) {
+                try await sz.extract(primary, entries: entries, to: destination, password: password, progress: progress)
+                return
+            }
+            throw error
+        }
     }
 
     public func quickExtractAll(
@@ -163,6 +232,29 @@ public actor ArchiveEngineBroker {
         }
         if profile.volumeSize != nil {
             required.insert(.splitVolumes)
+        }
+
+        let isExternal = destination.path.hasPrefix("/Volumes/") || sources.contains(where: { $0.path.hasPrefix("/Volumes/") })
+        let totalEstimatedSize: Int64 = sources.reduce(0) { sum, url in
+            let sz = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            return sum + Int64(sz)
+        }
+        let isLarge = totalEstimatedSize > 100 * 1024 * 1024 // > 100MB
+
+        // Prioritize SevenZipEngine for external volumes, large archives, store mode (level 0),
+        // or advanced features (passwords, split volumes, 7z) to benefit from 8-thread streaming & 0-RAM buffering
+        if let sz = engines.first(where: { $0.id == "sevenZip" }) as? SevenZipEngine,
+           sz.isAvailable,
+           sz.capabilities(for: profile.format).isSuperset(of: required),
+           (isExternal || isLarge || profile.password != nil || profile.volumeSize != nil || profile.format == .sevenZip || profile.level == 0) {
+            try await sz.create(
+                sources: sources,
+                at: destination,
+                profile: profile,
+                sourceMode: sourceMode,
+                progress: progress
+            )
+            return
         }
 
         // Select engine based on profile.format

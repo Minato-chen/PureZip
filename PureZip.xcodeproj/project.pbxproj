@@ -30,6 +30,9 @@
 		4799CB1290C26742C7B8E043 /* EntryIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 803D9E75AE682A9931BD8ECE /* EntryIndex.swift */; };
 		47C734945BFCFD4881B5ED68 /* PureActionsRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2BFB9BAD942B31B16128051 /* PureActionsRouter.swift */; };
 		4AD4BDBAD88D3A2060B52ABE /* PureZipPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9BE1ADBFFA31E347D735787 /* PureZipPreferences.swift */; };
+		B1C2D3E4F5A60123456789BB /* ImagePreviewHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60123456789AA /* ImagePreviewHelper.swift */; };
+		B1C2D3E4F5A60123456789DD /* QuickActionProgressHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60123456789CC /* QuickActionProgressHUD.swift */; };
+		B1C2D3E4F5A60123456789FF /* FinderSyncExtensionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60123456789EE /* FinderSyncExtensionManager.swift */; };
 		4B70BE65BCD1F8A79557BE6E /* ArchiveVolumeFamily.swift in Sources */ = {isa = PBXBuildFile; fileRef = E330FFB73629546DD3559943 /* ArchiveVolumeFamily.swift */; };
 		50B3FFA236FCA442E2AB0B8C /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AEC559752405E9C1238D27A2 /* Quartz.framework */; };
 		52272B249AB7F9A98320D23C /* ArchiveEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77E45B5D3B0F7C95B05793B3 /* ArchiveEngine.swift */; };
@@ -310,6 +313,9 @@
 		D79EDC9F38F229EB93C47774 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		D991DB6957CD17DE0F7A75DA /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = AppKit.framework; sourceTree = "<group>"; };
 		D9BE1ADBFFA31E347D735787 /* PureZipPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PureZipPreferences.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60123456789AA /* ImagePreviewHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePreviewHelper.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60123456789CC /* QuickActionProgressHUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionProgressHUD.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60123456789EE /* FinderSyncExtensionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderSyncExtensionManager.swift; sourceTree = "<group>"; };
 		DDCF3248069372BB841B04FD /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 		E1B1E74FD844615F5A137111 /* PureZipFinderSync.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PureZipFinderSync.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E25BD7F1ED84A3C232D788DA /* PureZipQuickLook.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PureZipQuickLook.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -421,6 +427,8 @@
 				D2BFB9BAD942B31B16128051 /* PureActionsRouter.swift */,
 				74DE0E61E0CA198AF10EAEC7 /* PureZipAppMain.swift */,
 				BA3E9EE97FE2F434C84C8848 /* PureZipAppViews.swift */,
+				A1B2C3D4E5F60123456789CC /* QuickActionProgressHUD.swift */,
+				A1B2C3D4E5F60123456789EE /* FinderSyncExtensionManager.swift */,
 				964B55765067BBA3F4E24D5D /* PureZipIcons.swift */,
 				5EDEB2540A4ED363B85864B2 /* PureZipLocalization.swift */,
 				CD443AC88F5CA7111ED7B3B6 /* PureZipStatusItemController.swift */,
@@ -444,6 +452,7 @@
 				771477339B4F2A92F9A9682E /* LegacyCJKFilenameDecoder.swift */,
 				07B24A738203F0FED6836F44 /* ManagedTemporaryArtifactRegistry.swift */,
 				D9BE1ADBFFA31E347D735787 /* PureZipPreferences.swift */,
+				A1B2C3D4E5F60123456789AA /* ImagePreviewHelper.swift */,
 				087030CC28D1C5F6C6067650 /* WorkerProtocol.swift */,
 			);
 			path = ArchiveCore;
@@ -834,6 +843,7 @@
 				EAFCF5F83C7176DB09EDD9DA /* LegacyCJKFilenameDecoder.swift in Sources */,
 				7178F66A4CAEC21A97CDC621 /* ManagedTemporaryArtifactRegistry.swift in Sources */,
 				4AD4BDBAD88D3A2060B52ABE /* PureZipPreferences.swift in Sources */,
+				B1C2D3E4F5A60123456789BB /* ImagePreviewHelper.swift in Sources */,
 				434B882EF45CDA35E8E6945E /* WorkerProtocol.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -866,6 +876,8 @@
 				47C734945BFCFD4881B5ED68 /* PureActionsRouter.swift in Sources */,
 				DAC21431B60C21B76060F577 /* PureZipAppMain.swift in Sources */,
 				8263EDEEE6A027C03035E41F /* PureZipAppViews.swift in Sources */,
+				B1C2D3E4F5A60123456789DD /* QuickActionProgressHUD.swift in Sources */,
+				B1C2D3E4F5A60123456789FF /* FinderSyncExtensionManager.swift in Sources */,
 				E2BDCDDAB66F3ACB0A7C9B75 /* PureZipIcons.swift in Sources */,
 				DC7EF9541E04D30897432A1C /* PureZipLocalization.swift in Sources */,
 				0C73E34EA4F812B0C56B6874 /* PureZipStatusItemController.swift in Sources */,
@@ -1017,7 +1029,7 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 259;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -1075,7 +1087,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 255;
+				CURRENT_PROJECT_VERSION = 259;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -1092,7 +1104,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.1.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1234,7 +1246,7 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 259;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -1316,7 +1328,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 255;
+				CURRENT_PROJECT_VERSION = 259;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -1339,7 +1351,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1382,7 +1394,7 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 259;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -1409,7 +1421,7 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 259;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -1453,7 +1465,7 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 259;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -1499,7 +1511,7 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 259;
 				DEAD_CODE_STRIPPING = YES;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;

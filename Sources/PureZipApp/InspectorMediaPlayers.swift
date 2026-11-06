@@ -85,18 +85,20 @@ public struct InspectorVideoPlayerView: View {
     let url: URL
     let metadata: VideoPreviewData
     let entryName: String
+    @ObservedObject var session: ArchiveBrowsingSession
 
     @State private var player: AVPlayer? = nil
     @State private var isPlaying: Bool = false
-    @State private var isMuted: Bool = true
     @State private var currentTime: Double = 0
     @State private var timeObserverToken: Any? = nil
+    @State private var endNotificationToken: Any? = nil
     @State private var isHovering: Bool = false
 
-    public init(url: URL, metadata: VideoPreviewData, entryName: String) {
+    public init(url: URL, metadata: VideoPreviewData, entryName: String, session: ArchiveBrowsingSession) {
         self.url = url
         self.metadata = metadata
         self.entryName = entryName
+        self.session = session
     }
 
     public var body: some View {
@@ -128,23 +130,101 @@ public struct InspectorVideoPlayerView: View {
                 .buttonStyle(.plain)
             }
 
-            // Bottom Player Floating Controls Bar
-            VStack {
+            // Overlay Chrome: Top Status Badges & Bottom Playback Controls
+            VStack(spacing: 0) {
+                // Top Overlay: [自动播放] [循环] on Left, [静音] on Right
+                HStack(spacing: 6) {
+                    // Left Group: Auto-Play & Loop Pills
+                    HStack(spacing: 5) {
+                        // Auto-Play Toggle (Session-scoped)
+                        Button {
+                            session.sessionVideoAutoPlay.toggle()
+                            if session.sessionVideoAutoPlay && !isPlaying {
+                                togglePlay()
+                            }
+                        } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: session.sessionVideoAutoPlay ? "play.square.stack.fill" : "play.square.stack")
+                                    .font(.system(size: 9.5, weight: .bold))
+                                Text("自动播放")
+                                    .font(.system(size: 10, weight: .medium))
+                            }
+                            .foregroundStyle(session.sessionVideoAutoPlay ? Color.white : Color.white.opacity(0.85))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3.5)
+                            .background(session.sessionVideoAutoPlay ? Color(red: 0.05, green: 0.48, blue: 0.98).opacity(0.9) : Color.black.opacity(0.55))
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(session.sessionVideoAutoPlay ? Color.clear : Color.white.opacity(0.25), lineWidth: 0.8)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .help(session.sessionVideoAutoPlay ? "自动播放模式：已开启（当前窗口内持续生效）" : "自动播放模式：已关闭（点击开启）")
+
+                        // Loop Toggle (Session-scoped)
+                        Button {
+                            session.sessionVideoLoop.toggle()
+                        } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: session.sessionVideoLoop ? "repeat.circle.fill" : "repeat")
+                                    .font(.system(size: 9.5, weight: .bold))
+                                Text("循环")
+                                    .font(.system(size: 10, weight: .medium))
+                            }
+                            .foregroundStyle(session.sessionVideoLoop ? Color.white : Color.white.opacity(0.85))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3.5)
+                            .background(session.sessionVideoLoop ? Color(red: 0.05, green: 0.48, blue: 0.98).opacity(0.9) : Color.black.opacity(0.55))
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(session.sessionVideoLoop ? Color.clear : Color.white.opacity(0.25), lineWidth: 0.8)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .help(session.sessionVideoLoop ? "循环播放：已开启（当前窗口内持续生效）" : "循环播放：已关闭（播放完回到首帧并暂停）")
+                    }
+
+                    Spacer()
+
+                    // Right Group: Mute / Unmute
+                    Button {
+                        toggleMute()
+                    } label: {
+                        Image(systemName: session.sessionMediaMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(session.sessionMediaMuted ? Color.orange : Color.white)
+                            .frame(width: 22, height: 22)
+                            .background(Color.black.opacity(0.55))
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white.opacity(0.25), lineWidth: 0.8)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help(session.sessionMediaMuted ? "已静音（当前窗口内持续生效，点击开启声音）" : "声音已开启（点击静音）")
+                }
+                .padding(.horizontal, 8)
+                .padding(.top, 8)
+
                 Spacer()
 
-                HStack(spacing: 10) {
-                    // Play / Pause
+                // Bottom Player Floating Controls Bar (Clean: Play/Pause + Full Scrubber + Time)
+                HStack(spacing: 8) {
+                    // Play / Pause Button
                     Button {
                         togglePlay()
                     } label: {
                         Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 12, weight: .bold))
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(.white)
-                            .frame(width: 24, height: 24)
+                            .frame(width: 20, height: 20)
                     }
                     .buttonStyle(.plain)
 
-                    // Scrubber Slider
+                    // Scrubber Slider - Expands gracefully across the width
                     Slider(
                         value: Binding(
                             get: { currentTime },
@@ -159,24 +239,12 @@ public struct InspectorVideoPlayerView: View {
 
                     // Time display
                     Text("\(formatTime(currentTime)) / \(metadata.durationFormatted)")
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.white)
-
-                    // Mute / Unmute
-                    Button {
-                        toggleMute()
-                    } label: {
-                        Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(isMuted ? Color.orange : Color.white)
-                            .frame(width: 24, height: 24)
-                    }
-                    .buttonStyle(.plain)
-                    .help(isMuted ? "已静音（点击开启声音）" : "声音已开启")
+                        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.9))
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(Color.black.opacity(0.70))
+                .background(Color.black.opacity(0.75))
                 .cornerRadius(8)
                 .padding(8)
             }
@@ -200,29 +268,60 @@ public struct InspectorVideoPlayerView: View {
     }
 
     private func setupPlayer() {
+        if session.sessionVideoAutoPlay {
+            initializePlayer(autoPlay: true)
+        } else {
+            // Lazy load: keep player nil and show keyframe until user clicks play
+            self.player = nil
+            self.isPlaying = false
+            self.currentTime = 0
+        }
+    }
+
+    private func initializePlayer(autoPlay: Bool) {
+        guard player == nil else {
+            if autoPlay {
+                player?.play()
+                isPlaying = true
+            }
+            return
+        }
+
         let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
         let item = AVPlayerItem(asset: asset)
-        // Limit decoding resolution to compact Inspector card size so 4K/8K videos decode instantly with low memory
         item.preferredMaximumResolution = CGSize(width: 640, height: 360)
         let p = AVPlayer(playerItem: item)
         p.automaticallyWaitsToMinimizeStalling = false
-        let defaultMute = PureZipPreferences.shared.deskMediaAlwaysMute
-        p.isMuted = defaultMute
-        self.isMuted = defaultMute
+        p.isMuted = session.sessionMediaMuted
         self.player = p
 
         let interval = CMTime(seconds: 0.2, preferredTimescale: 600)
         timeObserverToken = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak p] time in
-            guard let p = p else { return }
+            guard let _ = p else { return }
             self.currentTime = time.seconds
-            if time.seconds >= (self.metadata.duration - 0.2) && self.metadata.duration > 0 {
-                // Loop video
-                p.seek(to: .zero)
-                p.play()
+        }
+
+        endNotificationToken = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak p] _ in
+            Task { @MainActor in
+                guard let p = p else { return }
+                if self.session.sessionVideoLoop {
+                    p.seek(to: .zero)
+                    p.play()
+                    self.isPlaying = true
+                } else {
+                    p.seek(to: .zero)
+                    p.pause()
+                    self.isPlaying = false
+                    self.currentTime = 0
+                }
             }
         }
 
-        if PureZipPreferences.shared.deskVideoAutoPlay {
+        if autoPlay {
             p.play()
             self.isPlaying = true
         }
@@ -233,11 +332,20 @@ public struct InspectorVideoPlayerView: View {
             p.removeTimeObserver(token)
             timeObserverToken = nil
         }
+        if let token = endNotificationToken {
+            NotificationCenter.default.removeObserver(token)
+            endNotificationToken = nil
+        }
         player?.pause()
         player = nil
+        isPlaying = false
     }
 
     private func togglePlay() {
+        if player == nil {
+            initializePlayer(autoPlay: true)
+            return
+        }
         guard let p = player else { return }
         if isPlaying {
             p.pause()
@@ -249,12 +357,14 @@ public struct InspectorVideoPlayerView: View {
     }
 
     private func toggleMute() {
-        guard let p = player else { return }
-        isMuted.toggle()
-        p.isMuted = isMuted
+        session.sessionMediaMuted.toggle()
+        player?.isMuted = session.sessionMediaMuted
     }
 
     private func seek(to seconds: Double) {
+        if player == nil {
+            initializePlayer(autoPlay: false)
+        }
         guard let p = player else { return }
         let target = CMTime(seconds: seconds, preferredTimescale: 600)
         let tolerance = CMTime(seconds: 0.5, preferredTimescale: 600)
@@ -275,19 +385,20 @@ public struct InspectorAudioPlayerView: View {
     let url: URL
     let metadata: AudioPreviewData
     let entryName: String
+    @ObservedObject var session: ArchiveBrowsingSession
 
     @State private var player: AVPlayer? = nil
     @State private var isPlaying: Bool = false
-    @State private var isMuted: Bool = true
     @State private var currentTime: Double = 0
     @State private var timeObserverToken: Any? = nil
     @State private var showLyrics: Bool = false
     @Environment(\.colorScheme) private var colorScheme
 
-    public init(url: URL, metadata: AudioPreviewData, entryName: String) {
+    public init(url: URL, metadata: AudioPreviewData, entryName: String, session: ArchiveBrowsingSession) {
         self.url = url
         self.metadata = metadata
         self.entryName = entryName
+        self.session = session
     }
 
     private var progress: Double {
@@ -421,20 +532,66 @@ public struct InspectorAudioPlayerView: View {
                     Button {
                         toggleMute()
                     } label: {
-                        Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                        Image(systemName: session.sessionMediaMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                             .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(isMuted ? Color.orange : Color.secondary)
+                            .foregroundStyle(session.sessionMediaMuted ? Color.orange : Color.secondary)
                             .frame(width: 22, height: 22)
                     }
                     .buttonStyle(.plain)
-                    .help(isMuted ? "默认静音（点击开启声音）" : "声音已开启")
+                    .help(session.sessionMediaMuted ? "已静音（点击开启声音）" : "声音已开启")
                 }
 
-                HStack {
+                HStack(alignment: .center) {
                     Text(formatTime(currentTime))
                         .font(.system(size: 10.5, design: .monospaced))
                         .foregroundStyle(.secondary)
+
                     Spacer()
+
+                    // Auto-Play & Loop Pills (aligned with Video Player)
+                    HStack(spacing: 5) {
+                        Button {
+                            session.sessionAudioAutoPlay.toggle()
+                            if session.sessionAudioAutoPlay && !isPlaying {
+                                togglePlay()
+                            }
+                        } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: session.sessionAudioAutoPlay ? "play.square.stack.fill" : "play.square.stack")
+                                    .font(.system(size: 9.5, weight: .bold))
+                                Text("自动播放")
+                                    .font(.system(size: 10, weight: .medium))
+                            }
+                            .foregroundStyle(session.sessionAudioAutoPlay ? Color.white : (colorScheme == .dark ? Color.white.opacity(0.85) : Color.primary))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(session.sessionAudioAutoPlay ? Color(red: 0.05, green: 0.48, blue: 0.98) : (colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.06)))
+                            .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .help(session.sessionAudioAutoPlay ? "自动播放模式：已开启（当前窗口内持续生效）" : "自动播放模式：已关闭（点击开启）")
+
+                        Button {
+                            session.sessionAudioLoop.toggle()
+                        } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: session.sessionAudioLoop ? "repeat.circle.fill" : "repeat")
+                                    .font(.system(size: 9.5, weight: .bold))
+                                Text("循环")
+                                    .font(.system(size: 10, weight: .medium))
+                            }
+                            .foregroundStyle(session.sessionAudioLoop ? Color.white : (colorScheme == .dark ? Color.white.opacity(0.85) : Color.primary))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(session.sessionAudioLoop ? Color(red: 0.05, green: 0.48, blue: 0.98) : (colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.06)))
+                            .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .help(session.sessionAudioLoop ? "循环播放：已开启（当前窗口内持续生效）" : "循环播放：已关闭（播放完回到首帧并暂停）")
+                    }
+
+                    Spacer()
+
                     Text(metadata.durationFormatted)
                         .font(.system(size: 10.5, design: .monospaced))
                         .foregroundStyle(.secondary)
@@ -499,19 +656,30 @@ public struct InspectorAudioPlayerView: View {
         let item = AVPlayerItem(asset: asset)
         let p = AVPlayer(playerItem: item)
         p.automaticallyWaitsToMinimizeStalling = false
-        let defaultMute = PureZipPreferences.shared.deskMediaAlwaysMute
-        p.isMuted = defaultMute
-        self.isMuted = defaultMute
+        p.isMuted = session.sessionMediaMuted
         self.player = p
+
+        if session.sessionAudioAutoPlay {
+            p.play()
+            self.isPlaying = true
+        }
 
         let interval = CMTime(seconds: 0.15, preferredTimescale: 600)
         timeObserverToken = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak p] time in
-            guard let p = p else { return }
-            self.currentTime = time.seconds
-            if time.seconds >= (self.metadata.duration - 0.2) && self.metadata.duration > 0 {
-                p.seek(to: .zero)
-                p.pause()
-                self.isPlaying = false
+            Task { @MainActor in
+                guard let p = p else { return }
+                self.currentTime = time.seconds
+                if time.seconds >= (self.metadata.duration - 0.2) && self.metadata.duration > 0 {
+                    if self.session.sessionAudioLoop {
+                        p.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
+                        p.play()
+                        self.isPlaying = true
+                    } else {
+                        p.seek(to: .zero)
+                        p.pause()
+                        self.isPlaying = false
+                    }
+                }
             }
         }
     }
@@ -537,9 +705,8 @@ public struct InspectorAudioPlayerView: View {
     }
 
     private func toggleMute() {
-        guard let p = player else { return }
-        isMuted.toggle()
-        p.isMuted = isMuted
+        session.sessionMediaMuted.toggle()
+        player?.isMuted = session.sessionMediaMuted
     }
 
     private func seek(to seconds: Double) {

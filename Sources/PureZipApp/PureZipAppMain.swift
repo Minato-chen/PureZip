@@ -20,16 +20,60 @@ public final class PureZipApplicationDelegate: NSObject, NSApplicationDelegate {
         // Initialize status item with left-click PureShelf popover & right-click context menu (Quit)
         statusItemController = PureZipStatusItemController(session: session)
 
-        // Install local monitor for Spacebar (keyCode 49) to toggle native macOS QuickLook
+        // Install local monitor for keyboard navigation & Spacebar QuickLook
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.keyCode == 49 { // Spacebar
-                if let window = NSApp.keyWindow,
-                   let responder = window.firstResponder,
-                   responder.isKind(of: NSTextView.self) || responder.isKind(of: NSTextField.self) {
-                    return event
-                }
-                self?.session.toggleQuickLookForSelected()
+            guard let self = self else { return event }
+
+            // Dismiss hover preview immediately when user presses any key and record mouse position
+            HoverPreviewCoordinator.shared.recordKeyAction()
+
+            // Do not intercept keystrokes if the user is typing into a text field or text view
+            if let window = NSApp.keyWindow,
+               let responder = window.firstResponder,
+               responder.isKind(of: NSTextView.self) || responder.isKind(of: NSTextField.self) {
+                return event
+            }
+
+            switch event.keyCode {
+            case 49: // Spacebar
+                self.session.toggleQuickLookForSelected()
                 return nil
+            case 126: // Up Arrow
+                if event.modifierFlags.contains(.command) {
+                    // Cmd + Up: Enclose / Go to parent folder (macOS standard)
+                    if self.session.navigateUp() {
+                        return nil
+                    }
+                } else if self.session.navigateSelection(.up) {
+                    return nil
+                }
+            case 125: // Down Arrow
+                if event.modifierFlags.contains(.command) {
+                    // Cmd + Down: Enter directory / open file (macOS standard)
+                    if self.session.activateSelectedEntry() {
+                        return nil
+                    }
+                } else if self.session.navigateSelection(.down) {
+                    return nil
+                }
+            case 123: // Left Arrow
+                if self.session.navigateSelection(.left) {
+                    return nil
+                }
+            case 124: // Right Arrow
+                if self.session.navigateSelection(.right) {
+                    return nil
+                }
+            case 36, 76: // Return / Enter (Main & Numpad)
+                if self.session.activateSelectedEntry() {
+                    return nil
+                }
+            case 51: // Backspace / Delete
+                if self.session.navigateUp() {
+                    return nil
+                }
+            default:
+                break
             }
             return event
         }
@@ -78,7 +122,7 @@ public final class PureZipApplicationDelegate: NSObject, NSApplicationDelegate {
             if FileManager.default.fileExists(atPath: lsregisterPath) {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: lsregisterPath)
-                process.arguments = ["-f", bundleURL.path]
+                process.arguments = ["-f", "-R", "-trusted", bundleURL.path]
                 try? process.run()
             }
 
@@ -94,6 +138,10 @@ public final class PureZipApplicationDelegate: NSObject, NSApplicationDelegate {
                 useProc.executableURL = URL(fileURLWithPath: "/usr/bin/pluginkit")
                 useProc.arguments = ["-e", "use", "-i", "com.minato.purezip.FinderSync"]
                 try? useProc.run()
+            }
+
+            Task { @MainActor in
+                FinderSyncExtensionManager.shared.checkStatus()
             }
         }
     }

@@ -47,6 +47,7 @@ notarization_key.json
 # Scratch, Temporary & Logs
 *.tmp
 *.log
+开源项目/
 
 # Local Test Fixtures & Generated Archives
 ziptest/

@@ -65,6 +65,8 @@ public final class FinderSync: FIFinderSync {
                 if dedupedArchives.count == 1 {
                     let singleArchive = dedupedArchives[0]
                     let folderStem = ArchiveVolumeFamily.extractionFolderStem(for: singleArchive)
+                    let maxChars = 18
+                    let displayFolderStem = folderStem.count > maxChars ? String(folderStem.prefix(15)) + "..." : folderStem
 
                     subMenu.addItem(makeItem(
                         title: "用 PureZip 浏览归档",
@@ -75,7 +77,7 @@ public final class FinderSync: FIFinderSync {
                     subMenu.addItem(NSMenuItem.separator())
 
                     subMenu.addItem(makeItem(
-                        title: "解压到 \"\(folderStem)/\"",
+                        title: "解压到 \"\(displayFolderStem)/\"",
                         action: #selector(quickExtractToNamedFolder(_:)),
                         symbol: "folder.badge.plus"
                     ))
@@ -129,24 +131,30 @@ public final class FinderSync: FIFinderSync {
             }
 
             // 2. Compression items
-            if let firstURL = activeItems.first {
+            if !activeItems.isEmpty {
                 if hasArchives {
                     subMenu.addItem(NSMenuItem.separator())
                 }
 
+                let isSingle = activeItems.count == 1
+                let firstURL = activeItems[0]
                 let (compStem, _) = ArchiveOutputFamily.splitArchiveStemAndCompoundExtension(firstURL.lastPathComponent)
-                let targetStem = compStem.isEmpty ? "Archive" : compStem
+                let rawStem = compStem.isEmpty ? "Archive" : compStem
+                let maxChars = 18
+                let displayStem = rawStem.count > maxChars ? String(rawStem.prefix(15)) + "..." : rawStem
+
+                let zipTitle = isSingle ? "压缩为 \"\(displayStem).zip\"" : "压缩为 ZIP (共 \(activeItems.count) 项)"
 
                 subMenu.addItem(makeItem(
-                    title: "压缩为 \"\(targetStem).zip\"",
+                    title: zipTitle,
                     action: #selector(quickZIP(_:)),
                     symbol: "archivebox"
                 ))
 
                 subMenu.addItem(makeItem(
-                    title: "压缩为 \"\(targetStem).7z\"",
-                    action: #selector(quick7Z(_:)),
-                    symbol: "archivebox.fill"
+                    title: "压缩到...",
+                    action: #selector(quickCompressTo(_:)),
+                    symbol: "folder.badge.plus"
                 ))
 
                 subMenu.addItem(makeItem(
@@ -236,6 +244,10 @@ public final class FinderSync: FIFinderSync {
 
     @objc public func quickZIP(_ sender: AnyObject?) {
         dispatchFinderAction(.quickZIP)
+    }
+
+    @objc public func quickCompressTo(_ sender: AnyObject?) {
+        dispatchFinderAction(.quickCompressTo)
     }
 
     @objc public func quick7Z(_ sender: AnyObject?) {

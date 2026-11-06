@@ -667,11 +667,7 @@ public final class ArchiveAssociationStore: ObservableObject {
                currentURL.standardizedFileURL == targetURL.standardizedFileURL {
                 continue
             }
-            let sema = DispatchSemaphore(value: 0)
-            NSWorkspace.shared.setDefaultApplication(at: targetURL, toOpen: ut) { _ in
-                sema.signal()
-            }
-            _ = sema.wait(timeout: .now() + 0.3)
+            NSWorkspace.shared.setDefaultApplication(at: targetURL, toOpen: ut) { _ in }
         }
     }
 

@@ -128,8 +128,18 @@ public final class ArchiveBrowsingSession: ObservableObject {
     @Published public var selectedEntryPreview: SelectedEntryPreview?
     @Published public var isLoadingEntryPreview: Bool = false
     @Published public var containsNestedArchives: Bool = false
+    @Published public var gridColumnCount: Int = 6
+    public let columnBrowserState = ColumnBrowserState()
     @Published public var hoveredCandidate: HoverPreviewCandidate?
     @Published public var quickLookItemURL: URL? = nil
+
+    // Window session-scoped media playback states (resets on window/archive close)
+    @Published public var sessionVideoAutoPlay: Bool = PureZipPreferences.shared.deskVideoAutoPlay
+    @Published public var sessionVideoLoop: Bool = false
+    @Published public var sessionAudioAutoPlay: Bool = PureZipPreferences.shared.deskAudioAutoPlay
+    @Published public var sessionAudioLoop: Bool = PureZipPreferences.shared.deskAudioLoop
+    @Published public var sessionMediaMuted: Bool = PureZipPreferences.shared.deskMediaAlwaysMute
+    private var prefetchTask: Task<Void, Never>?
 
     // Creation Sheet Trigger
     @Published public var creationSources: [URL]? = nil
@@ -207,6 +217,7 @@ public final class ArchiveBrowsingSession: ObservableObject {
     // Status & Progress
     @Published public var isBusy: Bool = false
     @Published public var statusMessage: String = "就绪 — 打开或拖入归档文件以开始浏览"
+    @Published public var lastLoadError: String? = nil
     @Published public var progressFraction: Double?
 
     // MARK: - Core Subsystems
@@ -217,6 +228,7 @@ public final class ArchiveBrowsingSession: ObservableObject {
     public private(set) var entryIndex: EntryIndex?
     private var activeNestedLeases: [ManagedWorkFileLease] = []
     private var previewLoadTask: Task<Void, Never>?
+    private var currentOpenTaskID: UUID = UUID()
     private var activeMediaTempURL: URL?
 
     public var isCapsuleMode: Bool {
@@ -291,13 +303,30 @@ public final class ArchiveBrowsingSession: ObservableObject {
     // MARK: - Two-Phase Archive Opening & SQLite Indexing
 
     public func openArchive(at rawURL: URL, resetNestedStack: Bool = true) async {
+        let taskID = UUID()
+        self.currentOpenTaskID = taskID
         previewLoadTask?.cancel()
         previewLoadTask = nil
+        prefetchTask?.cancel()
+        prefetchTask = nil
         cleanupActiveMediaTemp()
+        self.sessionVideoAutoPlay = PureZipPreferences.shared.deskVideoAutoPlay
+        self.sessionVideoLoop = false
+        self.sessionAudioAutoPlay = PureZipPreferences.shared.deskAudioAutoPlay
+        self.sessionAudioLoop = PureZipPreferences.shared.deskAudioLoop
+        self.sessionMediaMuted = PureZipPreferences.shared.deskMediaAlwaysMute
 
         let primaryURL = ArchiveVolumeFamily.primaryURL(for: rawURL)
+        self.lastLoadError = nil
+        self.statusMessage = "正在载入 \(primaryURL.lastPathComponent)..."
+        self.isBusy = true
+
         guard FileManager.default.fileExists(atPath: primaryURL.path) else {
-            statusMessage = "找不到文件: \(primaryURL.path)"
+            if self.currentOpenTaskID == taskID {
+                self.isBusy = false
+                self.statusMessage = "找不到文件: \(primaryURL.path)"
+                self.lastLoadError = "未能找到归档文件。若位于外接移动设备，请确认硬盘已正常挂载并连接稳定。"
+            }
             return
         }
 
@@ -314,7 +343,6 @@ public final class ArchiveBrowsingSession: ObservableObject {
             hasUnsavedChanges = false
         }
 
-        isBusy = true
         progressFraction = nil
         selectedEntryID = nil
         selectedEntryPreview = nil
@@ -328,6 +356,8 @@ public final class ArchiveBrowsingSession: ObservableObject {
 
         do {
             let desc = try await broker.descriptor(for: primaryURL)
+            guard self.currentOpenTaskID == taskID && !Task.isCancelled else { return }
+
             if desc.format == .dmg {
                 self.windowMode = .capsuleFloating
                 self.isDMGCapsuleExpanded = false
@@ -354,6 +384,7 @@ public final class ArchiveBrowsingSession: ObservableObject {
             // Phase 1: Check PreviewSeedStore or fetch initialRootEntries for instant first paint
             if let fp = try? ArchiveSourceFingerprint.capture(at: primaryURL),
                let seedClaim = try? await previewSeedStore.claim(matching: fp) {
+                guard self.currentOpenTaskID == taskID && !Task.isCancelled else { return }
                 self.displayedEntries = ArchiveBrowserProjection.directChildren(
                     of: seedClaim.entries,
                     in: "",
@@ -362,9 +393,11 @@ public final class ArchiveBrowsingSession: ObservableObject {
                 statusMessage = "已从 QuickLook 预览种子极速加载 (\(seedClaim.entries.count) 项)"
             } else if desc.format != .dmg,
                       let initialRoots = try? await broker.initialRootEntries(primaryURL, format: desc.format, limit: 200) {
+                guard self.currentOpenTaskID == taskID && !Task.isCancelled else { return }
                 self.displayedEntries = initialRoots
                 statusMessage = "正在构建 SQLite EntryIndex 目录树索引..."
             } else {
+                guard self.currentOpenTaskID == taskID && !Task.isCancelled else { return }
                 statusMessage = desc.format == .dmg ? "正在解析磁盘映像目录结构..." : "正在构建 SQLite EntryIndex 目录树索引..."
             }
 
@@ -376,8 +409,10 @@ public final class ArchiveBrowsingSession: ObservableObject {
                 }
             }
             for try await batch in stream {
+                guard self.currentOpenTaskID == taskID && !Task.isCancelled else { return }
                 try newIndex.insert(batch)
             }
+            guard self.currentOpenTaskID == taskID && !Task.isCancelled else { return }
             self.entryIndex = newIndex
             self.indexRevision += 1
             try refreshDisplayedEntries()
@@ -452,8 +487,10 @@ public final class ArchiveBrowsingSession: ObservableObject {
                 self.dmgAppIcon = nil
                 self.dmgViewMode = .list
             }
-            statusMessage = "已加载 \(primaryURL.lastPathComponent) — 共 \(totalIndexedCount) 个条目 (SQLite WAL 索引就绪)"
+            self.statusMessage = "已加载 \(primaryURL.lastPathComponent) — 共 \(totalIndexedCount) 个条目"
+            self.lastLoadError = nil
         } catch {
+            guard self.currentOpenTaskID == taskID else { return }
             let errString = error.localizedDescription.lowercased()
             if let engErr = error as? ArchiveEngineError, engErr == .wrongPassword || errString.contains("password") {
                 statusMessage = "该归档已加密，请输入解压密码"
@@ -465,11 +502,15 @@ public final class ArchiveBrowsingSession: ObservableObject {
                     }
                 }
             } else {
-                statusMessage = "加载失败: \(error.localizedDescription)"
+                let msg = "加载失败: \(error.localizedDescription)"
+                statusMessage = msg
+                lastLoadError = msg
             }
         }
 
-        isBusy = false
+        if self.currentOpenTaskID == taskID {
+            isBusy = false
+        }
     }
 
     public func refreshDisplayedEntries() throws {
@@ -613,7 +654,14 @@ public final class ArchiveBrowsingSession: ObservableObject {
     private func performCloseArchive() {
         previewLoadTask?.cancel()
         previewLoadTask = nil
+        prefetchTask?.cancel()
+        prefetchTask = nil
         cleanupActiveMediaTemp()
+        self.sessionVideoAutoPlay = PureZipPreferences.shared.deskVideoAutoPlay
+        self.sessionVideoLoop = false
+        self.sessionAudioAutoPlay = PureZipPreferences.shared.deskAudioAutoPlay
+        self.sessionAudioLoop = PureZipPreferences.shared.deskAudioLoop
+        self.sessionMediaMuted = PureZipPreferences.shared.deskMediaAlwaysMute
 
         QuickLookPreviewController.shared.closePreview()
         ArchiveHoverPreviewPanelController.shared.hide()
@@ -642,6 +690,8 @@ public final class ArchiveBrowsingSession: ObservableObject {
     public func navigateToDirectory(_ path: String) {
         previewLoadTask?.cancel()
         previewLoadTask = nil
+        prefetchTask?.cancel()
+        prefetchTask = nil
         cleanupActiveMediaTemp()
 
         ArchiveHoverPreviewPanelController.shared.hide()
@@ -652,15 +702,29 @@ public final class ArchiveBrowsingSession: ObservableObject {
         try? refreshDisplayedEntries()
     }
 
-    public func navigateUp() {
+    @discardableResult
+    public func navigateUp() -> Bool {
+        if viewMode == .columns && !isCapsuleMode {
+            if columnBrowserState.exitToParentColumn(session: self) {
+                return true
+            }
+            if !nestedStack.isEmpty {
+                Task { await popNestedArchive() }
+                return true
+            }
+            return false
+        }
+
         guard !currentDirectoryPath.isEmpty else {
             if !nestedStack.isEmpty {
                 Task { await popNestedArchive() }
+                return true
             }
-            return
+            return false
         }
         let comps = currentDirectoryPath.split(separator: "/").dropLast()
         navigateToDirectory(comps.joined(separator: "/"))
+        return true
     }
 
     public var breadcrumbComponents: [(title: String, path: String)] {
@@ -764,6 +828,8 @@ public final class ArchiveBrowsingSession: ObservableObject {
     public func selectEntry(_ entry: ArchiveEntry?) {
         previewLoadTask?.cancel()
         previewLoadTask = nil
+        prefetchTask?.cancel()
+        prefetchTask = nil
         cleanupActiveMediaTemp()
         isLoadingEntryPreview = false
 
@@ -774,6 +840,163 @@ public final class ArchiveBrowsingSession: ObservableObject {
         }
         QuickLookPreviewController.shared.updatePreviewIfVisible(for: entry, session: self)
         previewLoadTask = Task { await loadEntryPreview(for: entry) }
+        prefetchNeighbors(around: entry)
+    }
+
+    private func prefetchNeighbors(around entry: ArchiveEntry) {
+        guard let archiveURL = currentArchiveURL else { return }
+
+        // Find candidate neighbor entries in current view context
+        let currentList: [ArchiveEntry] = {
+            if viewMode == .columns && !isCapsuleMode {
+                let colIdx = max(0, min(columnBrowserState.focusedColumnIndex, columnBrowserState.columnNodes.count - 1))
+                if colIdx < columnBrowserState.columnNodes.count {
+                    return columnBrowserState.columnNodes[colIdx].entries
+                }
+            }
+            return displayedEntries
+        }()
+
+        guard let curIdx = currentList.firstIndex(where: { $0.id == entry.id }) else { return }
+
+        var candidates: [ArchiveEntry] = []
+        if curIdx + 1 < currentList.count {
+            candidates.append(currentList[curIdx + 1])
+        }
+        if curIdx > 0 {
+            candidates.append(currentList[curIdx - 1])
+        }
+        if curIdx + 2 < currentList.count {
+            candidates.append(currentList[curIdx + 2])
+        }
+
+        let broker = self.broker
+        prefetchTask = Task.detached(priority: .utility) {
+            for cand in candidates {
+                guard !Task.isCancelled else { break }
+                guard cand.type == .file else { continue }
+                let ext = (cand.name as NSString).pathExtension.lowercased()
+                let isVid = MediaPreviewExtractor.isVideo(ext: ext)
+                let isImg = ImagePreviewHelper.isSupportedImage(ext: ext)
+                guard isVid || isImg else { continue }
+
+                let key = "\(archiveURL.path):\(cand.path)"
+                if isVid && PreviewArtifactCache.shared.videoData(for: key) != nil { continue }
+                if isImg && PreviewArtifactCache.shared.image(for: key) != nil { continue }
+
+                do {
+                    let extracted = try await PreviewArtifactCache.shared.sharedExtractedFile(for: cand, in: archiveURL, broker: broker)
+                    guard !Task.isCancelled else { break }
+                    if isVid {
+                        let vData = await MediaPreviewExtractor.extractVideoData(
+                            from: extracted,
+                            maxKeyframes: 4,
+                            targetSize: CGSize(width: 360, height: 202)
+                        )
+                        PreviewArtifactCache.shared.setVideoData(vData, for: key)
+                    } else if isImg {
+                        if let thumb = ImagePreviewHelper.createThumbnail(at: extracted, maxPixelSize: 1200) {
+                            PreviewArtifactCache.shared.setImage(thumb, for: key)
+                        }
+                    }
+                } catch {
+                    // Pre-fetching is best-effort
+                }
+            }
+        }
+    }
+
+    // MARK: - Keyboard Navigation
+
+    public enum NavigationDirection: Sendable {
+        case up
+        case down
+        case left
+        case right
+    }
+
+    @discardableResult
+    public func navigateSelection(_ direction: NavigationDirection) -> Bool {
+        guard currentArchiveURL != nil else { return false }
+
+        if viewMode == .columns && !isCapsuleMode {
+            return columnBrowserState.navigate(direction: direction, session: self)
+        }
+
+        let entries = displayedEntries
+        guard !entries.isEmpty else { return false }
+
+        let currentIndex = entries.firstIndex(where: { $0.id == selectedEntryID })
+
+        if isCapsuleMode || viewMode == .list {
+            switch direction {
+            case .up:
+                let target = currentIndex.map { max(0, $0 - 1) } ?? (entries.count - 1)
+                selectEntry(entries[target])
+                return true
+            case .down:
+                let target = currentIndex.map { min(entries.count - 1, $0 + 1) } ?? 0
+                selectEntry(entries[target])
+                return true
+            case .left, .right:
+                // Scheme B: Direction keys do NOT change hierarchy!
+                return false
+            }
+        } else if viewMode == .icons {
+            let cols = max(1, gridColumnCount)
+            switch direction {
+            case .right:
+                // Move to next entry; when at end of row, wraps to start of next row
+                let target = currentIndex.map { min(entries.count - 1, $0 + 1) } ?? 0
+                selectEntry(entries[target])
+                return true
+            case .left:
+                // Move to previous entry; when at start of row, wraps to end of previous row
+                if let idx = currentIndex {
+                    if idx > 0 {
+                        selectEntry(entries[idx - 1])
+                        return true
+                    }
+                    // At boundary index 0, stop at boundary. Direction keys do NOT change hierarchy!
+                    return false
+                } else {
+                    selectEntry(entries.first)
+                    return true
+                }
+            case .down:
+                // Move down by one row (index + columnCount)
+                let target = currentIndex.map { min(entries.count - 1, $0 + cols) } ?? 0
+                selectEntry(entries[target])
+                return true
+            case .up:
+                // Move up by one row (index - columnCount)
+                let target = currentIndex.map { max(0, $0 - cols) } ?? 0
+                selectEntry(entries[target])
+                return true
+            }
+        }
+        return false
+    }
+
+    @discardableResult
+    public func activateSelectedEntry() -> Bool {
+        if viewMode == .columns && !isCapsuleMode {
+            if let entry = columnBrowserState.activeEntry {
+                if entry.type == .directory {
+                    if columnBrowserState.enterChildColumn(session: self) {
+                        return true
+                    }
+                }
+                handleDoubleClick(on: entry)
+                return true
+            }
+            return false
+        }
+        if let selID = selectedEntryID, let entry = displayedEntries.first(where: { $0.id == selID }) {
+            handleDoubleClick(on: entry)
+            return true
+        }
+        return false
     }
 
     private func cleanupActiveMediaTemp() {
@@ -797,15 +1020,18 @@ public final class ArchiveBrowsingSession: ObservableObject {
             )
             return
         }
-        // Cap live preview extraction: Media up to 2 GiB (with fast low-res frame & audio sampling), Nested Archives up to 500 MiB, documents/text up to 15 MiB
+        // Cap live preview extraction: Media up to 2 GiB (with fast low-res frame & audio sampling), Nested Archives up to 500 MiB, Images/RAW up to 200 MiB, documents/text up to 15 MiB
         let ext = (entry.name as NSString).pathExtension.lowercased()
         let isMedia = MediaPreviewExtractor.isAudio(ext: ext) || MediaPreviewExtractor.isVideo(ext: ext)
         let isNested = entry.isNestedArchive
+        let isImage = ImagePreviewHelper.isSupportedImage(ext: ext)
         let maxLimit: Int64
         if isMedia {
             maxLimit = 2 * 1024 * 1024 * 1024
         } else if isNested {
             maxLimit = 500 * 1024 * 1024
+        } else if isImage {
+            maxLimit = 200 * 1024 * 1024
         } else {
             maxLimit = 15 * 1024 * 1024
         }
@@ -939,7 +1165,14 @@ public final class ArchiveBrowsingSession: ObservableObject {
             guard !Task.isCancelled, selectedEntryID == entry.id else { return }
 
             let decision = SmartCompressionClassifier.classify(fileAt: extractedURL, compressionLevel: 6)
-            var image = isMedia ? nil : NSImage(contentsOf: extractedURL)
+            var image: NSImage? = nil
+            if !isMedia {
+                if isImage {
+                    image = ImagePreviewHelper.createThumbnail(at: extractedURL, maxPixelSize: 1600)
+                } else {
+                    image = NSImage(contentsOf: extractedURL)
+                }
+            }
 
             if image == nil, ext == "pdf",
                let pdfDoc = PDFDocument(url: extractedURL),
@@ -992,7 +1225,7 @@ public final class ArchiveBrowsingSession: ObservableObject {
                     fileAt: extractedURL,
                     size: CGSize(width: 512, height: 512),
                     scale: NSScreen.main?.backingScaleFactor ?? 2.0,
-                    representationTypes: .thumbnail
+                    representationTypes: .all
                 )
                 let (rep, _) = await withCheckedContinuation { continuation in
                     QLThumbnailGenerator.shared.generateBestRepresentation(for: req) { rep, err in
@@ -1089,7 +1322,7 @@ public final class ArchiveBrowsingSession: ObservableObject {
         await extractArchive(entries: [], to: parentDir, expandNestedArchives: expandNestedArchives)
     }
 
-    /// Prompts user to select a destination directory via NSOpenPanel
+    /// Prompts user to select a destination directory via NSOpenPanel (attaches as Sheet if PureDesk is active)
     public func extractToCustomDestination(expandNestedArchives: Bool = false) {
         guard let parentDir = outermostArchiveDirectoryURL else { return }
         let panel = NSOpenPanel()
@@ -1099,9 +1332,19 @@ public final class ArchiveBrowsingSession: ObservableObject {
         panel.allowsMultipleSelection = false
         panel.prompt = expandNestedArchives ? "解压并展开内部压缩包到此处" : "解压到此处"
         panel.directoryURL = parentDir
-        if panel.runModal() == .OK, let selectedURL = panel.url {
-            Task {
-                await extractArchive(entries: [], to: selectedURL, expandNestedArchives: expandNestedArchives)
+
+        if let window = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible && !$0.isMiniaturized && $0.title == "PureZip" }) {
+            panel.beginSheetModal(for: window) { [weak self] response in
+                guard let self = self, response == .OK, let selectedURL = panel.url else { return }
+                Task {
+                    await self.extractArchive(entries: [], to: selectedURL, expandNestedArchives: expandNestedArchives)
+                }
+            }
+        } else {
+            if panel.runModal() == .OK, let selectedURL = panel.url {
+                Task {
+                    await self.extractArchive(entries: [], to: selectedURL, expandNestedArchives: expandNestedArchives)
+                }
             }
         }
     }
@@ -1306,6 +1549,86 @@ public final class ArchiveBrowsingSession: ObservableObject {
         }
         progressFraction = nil
         isBusy = false
+    }
+
+    /// Directly extracts an archive to a specified directory without loading it into the main browser window.
+    public func extractArchiveDirectly(
+        archiveURL: URL,
+        to destinationDir: URL,
+        expandNestedArchives: Bool = false,
+        onProgress: ((Double) -> Void)? = nil
+    ) async throws -> [URL] {
+        let stageLease = try ManagedWorkFileStore.shared.makeStagingLease(prefix: "extract-direct")
+        defer { stageLease.release() }
+
+        try await broker.extract(
+            archiveURL,
+            entries: [],
+            to: stageLease.url,
+            password: nil
+        ) { prog in
+            if let total = prog.total, total > 0 {
+                let fraction = Double(prog.completed) / Double(total)
+                Task { @MainActor in
+                    onProgress?(fraction)
+                }
+            }
+        }
+
+        if expandNestedArchives {
+            _ = await recursivelyExpandNestedArchives(in: stageLease.url, maxDepth: 3)
+        }
+
+        let excludeAux = PureZipPreferences.shared.autoExcludeSystemAuxiliary
+        let manifest = try ExtractionFinalizationManifest.prepare(
+            stagingDirectory: stageLease.url,
+            shouldRemove: excludeAux ? nil : { _ in false }
+        )
+        var collisionIndex = DestinationCollisionIndex()
+        let published = try FinderExtractionPublisher.publishMergingContents(
+            using: manifest,
+            to: destinationDir,
+            collisionIndex: &collisionIndex,
+            directoryConflictPolicy: .rename
+        )
+        NSWorkspace.shared.activateFileViewerSelecting(published)
+        return published
+    }
+
+    /// Directly creates a zip/7z archive to a destination URL without loading it into the main browser window.
+    public func createArchiveDirectly(
+        sources: [URL],
+        destinationURL: URL,
+        format: ArchiveFormat = .zip,
+        level: Int = 6,
+        onProgress: ((Double) -> Void)? = nil
+    ) async throws -> URL {
+        guard !sources.isEmpty else {
+            throw FinderActionError.emptySelection
+        }
+        let registry = try ManagedTemporaryArtifactRegistry()
+        let lease = try await registry.reserveArchivePublication(finalURL: destinationURL)
+        do {
+            let profile = CompressionProfile(format: format, level: level)
+            try await broker.create(
+                sources: sources,
+                at: lease.stagedPrimaryURL,
+                profile: profile
+            ) { prog in
+                if let total = prog.total, total > 0 {
+                    let fraction = Double(prog.completed) / Double(total)
+                    Task { @MainActor in
+                        onProgress?(fraction)
+                    }
+                }
+            }
+            let result = try await lease.commit()
+            NSWorkspace.shared.activateFileViewerSelecting([result.primaryURL])
+            return result.primaryURL
+        } catch {
+            await lease.rollbackAndWait()
+            throw error
+        }
     }
 
     public func createArchive(sources: [URL], destinationURL: URL, format: ArchiveFormat, level: Int = 6) async {
@@ -1917,21 +2240,51 @@ public final class ArchiveBrowsingSession: ObservableObject {
         case "tar.gz", "tar": targetFormat = .tar
         default: targetFormat = .zip
         }
-        await createArchive(sources: items, destinationURL: destinationURL, format: targetFormat, level: 6)
-        if PureZipPreferences.shared.pureShelfAutoClearAfterPackaging {
-            await MainActor.run {
-                clearShelf()
+
+        QuickActionProgressHUD.shared.show(
+            title: "正在打包 \(destinationURL.lastPathComponent)",
+            symbol: "archivebox"
+        )
+        isBusy = true
+        progressFraction = 0.0
+        statusMessage = "正在打包 \(destinationURL.lastPathComponent)..."
+
+        do {
+            _ = try await createArchiveDirectly(sources: items, destinationURL: destinationURL, format: targetFormat, level: 6) { [weak self] frac in
+                self?.progressFraction = frac
+                QuickActionProgressHUD.shared.update(progress: frac)
             }
+            QuickActionProgressHUD.shared.finish(message: "已生成 \(destinationURL.lastPathComponent)")
+            statusMessage = "打包完成: \(destinationURL.lastPathComponent)"
+
+            if PureZipPreferences.shared.pureShelfAutoClearAfterPackaging {
+                await MainActor.run {
+                    clearShelf()
+                }
+            }
+        } catch {
+            QuickActionProgressHUD.shared.finish(message: "打包失败: \(error.localizedDescription)")
+            statusMessage = "打包失败: \(error.localizedDescription)"
         }
+        progressFraction = nil
+        isBusy = false
     }
 
     public func quickPackageShelf() {
         guard !shelfItems.isEmpty else { return }
         let panel = NSSavePanel()
         let ext = PureZipPreferences.shared.pureShelfDefaultFormat.lowercased()
-        panel.nameFieldStringValue = "PureShelf打包_\(Int(Date().timeIntervalSince1970)).\(ext)"
+        let firstStem: String
+        if let first = shelfItems.first {
+            let (stem, _) = ArchiveOutputFamily.splitArchiveStemAndCompoundExtension(first.lastPathComponent)
+            firstStem = stem.isEmpty ? "Archive" : stem
+        } else {
+            firstStem = "Archive"
+        }
+        panel.nameFieldStringValue = "\(firstStem).\(ext)"
         panel.prompt = "立即打包"
         panel.title = "保存压缩包"
+        panel.message = "选择保存位置并命名压缩包"
         NSApp.activate(ignoringOtherApps: true)
         if panel.runModal() == .OK, let url = panel.url {
             Task {
@@ -2000,7 +2353,7 @@ public final class ArchiveBrowsingSession: ObservableObject {
 
             try Data("""
             public struct DemoEngine {
-                public static let version = "1.0.4"
+                public static let version = "1.1.0"
             }
             """.utf8).write(to: srcDir.appendingPathComponent("DemoEngine.swift"))
 
@@ -2030,6 +2383,14 @@ public final class ArchiveBrowsingSession: ObservableObject {
     private var lastHandledURL: URL?
     private var lastHandledTime: Date?
 
+    private func hideAuxiliaryWindowsIfBrowsingInactive() {
+        if currentArchiveURL == nil {
+            for win in NSApp.windows where win.title == "PureZip" || win.identifier?.rawValue == "main" {
+                win.orderOut(nil)
+            }
+        }
+    }
+
     public func handleIncomingURL(_ url: URL) async {
         if let lastURL = lastHandledURL, let lastTime = lastHandledTime,
            lastURL == url, Date().timeIntervalSince(lastTime) < 0.6 {
@@ -2056,46 +2417,108 @@ public final class ArchiveBrowsingSession: ObservableObject {
             if let first = req.sources.first {
                 let primary = ArchiveVolumeFamily.primaryURL(for: first)
                 await openArchive(at: primary)
+                openMainWindow()
             }
         case .quickExtractToNamedFolder:
+            hideAuxiliaryWindowsIfBrowsingInactive()
             if let first = req.sources.first {
                 let primary = ArchiveVolumeFamily.primaryURL(for: first)
-                await openArchive(at: primary)
-                await extractToNamedSubfolder()
+                let stem = ArchiveVolumeFamily.extractionFolderStem(for: primary)
+                let targetDir = primary.deletingLastPathComponent().appendingPathComponent(stem, isDirectory: true)
+                try? FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+                QuickActionProgressHUD.shared.show(title: "正在解压 \(primary.lastPathComponent)", symbol: "folder.badge.plus")
+                do {
+                    _ = try await extractArchiveDirectly(archiveURL: primary, to: targetDir) { frac in
+                        QuickActionProgressHUD.shared.update(progress: frac)
+                    }
+                    QuickActionProgressHUD.shared.finish(message: "已解压到 \(stem)/")
+                } catch {
+                    QuickActionProgressHUD.shared.finish(message: "解压失败: \(error.localizedDescription)")
+                }
             }
         case .quickExtractHere:
+            hideAuxiliaryWindowsIfBrowsingInactive()
             if let first = req.sources.first {
                 let primary = ArchiveVolumeFamily.primaryURL(for: first)
-                await openArchive(at: primary)
-                await extractToCurrentDirectory()
+                let targetDir = primary.deletingLastPathComponent()
+                QuickActionProgressHUD.shared.show(title: "正在解压 \(primary.lastPathComponent)", symbol: "arrow.down.doc")
+                do {
+                    _ = try await extractArchiveDirectly(archiveURL: primary, to: targetDir) { frac in
+                        QuickActionProgressHUD.shared.update(progress: frac)
+                    }
+                    QuickActionProgressHUD.shared.finish(message: "解压完成")
+                } catch {
+                    QuickActionProgressHUD.shared.finish(message: "解压失败: \(error.localizedDescription)")
+                }
             }
         case .quickExtractTo:
+            hideAuxiliaryWindowsIfBrowsingInactive()
             if let first = req.sources.first {
                 let primary = ArchiveVolumeFamily.primaryURL(for: first)
-                await openArchive(at: primary)
-                extractToCustomDestination()
+                let panel = NSOpenPanel()
+                panel.canChooseFiles = false
+                panel.canChooseDirectories = true
+                panel.canCreateDirectories = true
+                panel.allowsMultipleSelection = false
+                panel.prompt = "解压到此处"
+                panel.message = "请选择解压文件的目标目录"
+                panel.directoryURL = primary.deletingLastPathComponent()
+                NSApp.activate(ignoringOtherApps: true)
+                let resp = panel.runModal()
+                guard resp == .OK, let targetDir = panel.url else { return }
+
+                QuickActionProgressHUD.shared.show(title: "正在解压 \(primary.lastPathComponent)", symbol: "ellipsis.circle")
+                do {
+                    _ = try await extractArchiveDirectly(archiveURL: primary, to: targetDir) { frac in
+                        QuickActionProgressHUD.shared.update(progress: frac)
+                    }
+                    QuickActionProgressHUD.shared.finish(message: "已解压至目标目录")
+                } catch {
+                    QuickActionProgressHUD.shared.finish(message: "解压失败: \(error.localizedDescription)")
+                }
             }
         case .quickExtractBatchToNamedFolders:
+            hideAuxiliaryWindowsIfBrowsingInactive()
             let distinct = ArchiveVolumeFamily.deduplicatedPrimaryArchives(from: req.sources)
             if distinct.count == 1, let first = distinct.first {
-                await openArchive(at: first)
-                await extractToNamedSubfolder()
+                let stem = ArchiveVolumeFamily.extractionFolderStem(for: first)
+                let targetDir = first.deletingLastPathComponent().appendingPathComponent(stem, isDirectory: true)
+                try? FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+                QuickActionProgressHUD.shared.show(title: "正在解压 \(first.lastPathComponent)", symbol: "folder.badge.plus")
+                do {
+                    _ = try await extractArchiveDirectly(archiveURL: first, to: targetDir) { frac in
+                        QuickActionProgressHUD.shared.update(progress: frac)
+                    }
+                    QuickActionProgressHUD.shared.finish(message: "已解压到 \(stem)/")
+                } catch {
+                    QuickActionProgressHUD.shared.finish(message: "解压失败: \(error.localizedDescription)")
+                }
             } else if distinct.count > 1 {
                 BatchExtractionManager.shared.startBatch(urls: distinct)
                 BatchExtractionManager.shared.extractToSubfolder = true
                 BatchExtractionManager.shared.runBatchExtraction()
             }
         case .quickExtractBatchHere:
+            hideAuxiliaryWindowsIfBrowsingInactive()
             let distinct = ArchiveVolumeFamily.deduplicatedPrimaryArchives(from: req.sources)
             if distinct.count == 1, let first = distinct.first {
-                await openArchive(at: first)
-                await extractToCurrentDirectory()
+                let targetDir = first.deletingLastPathComponent()
+                QuickActionProgressHUD.shared.show(title: "正在解压 \(first.lastPathComponent)", symbol: "arrow.down.doc")
+                do {
+                    _ = try await extractArchiveDirectly(archiveURL: first, to: targetDir) { frac in
+                        QuickActionProgressHUD.shared.update(progress: frac)
+                    }
+                    QuickActionProgressHUD.shared.finish(message: "解压完成")
+                } catch {
+                    QuickActionProgressHUD.shared.finish(message: "解压失败: \(error.localizedDescription)")
+                }
             } else if distinct.count > 1 {
                 BatchExtractionManager.shared.startBatch(urls: distinct)
                 BatchExtractionManager.shared.extractToSubfolder = false
                 BatchExtractionManager.shared.runBatchExtraction()
             }
         case .quickExtractBatchTo:
+            hideAuxiliaryWindowsIfBrowsingInactive()
             let distinct = ArchiveVolumeFamily.deduplicatedPrimaryArchives(from: req.sources)
             let panel = NSOpenPanel()
             panel.canChooseFiles = false
@@ -2103,29 +2526,97 @@ public final class ArchiveBrowsingSession: ObservableObject {
             panel.canCreateDirectories = true
             panel.allowsMultipleSelection = false
             panel.prompt = "批量解压到此处"
+            panel.message = "请选择批量解压的目标目录"
+            if let first = distinct.first {
+                panel.directoryURL = first.deletingLastPathComponent()
+            }
+            NSApp.activate(ignoringOtherApps: true)
             if panel.runModal() == .OK, let targetDir = panel.url {
-                for arch in distinct {
-                    await openArchive(at: arch)
-                    await extractArchive(entries: [], to: targetDir)
+                QuickActionProgressHUD.shared.show(title: "正在批量解压 \(distinct.count) 项...", symbol: "ellipsis.circle")
+                for (idx, arch) in distinct.enumerated() {
+                    do {
+                        _ = try await extractArchiveDirectly(archiveURL: arch, to: targetDir)
+                        let frac = Double(idx + 1) / Double(distinct.count)
+                        QuickActionProgressHUD.shared.update(progress: frac, subtitle: "已解压 \(idx + 1)/\(distinct.count)")
+                    } catch {}
                 }
+                QuickActionProgressHUD.shared.finish(message: "批量解压完成")
             }
         case .testArchive:
             if let first = req.sources.first {
                 let primary = ArchiveVolumeFamily.primaryURL(for: first)
                 await openArchive(at: primary)
+                openMainWindow()
                 await testCurrentArchiveIntegrity()
             }
+        case .quickCompressTo:
+            hideAuxiliaryWindowsIfBrowsingInactive()
+            let panel = NSOpenPanel()
+            panel.canChooseFiles = false
+            panel.canChooseDirectories = true
+            panel.canCreateDirectories = true
+            panel.allowsMultipleSelection = false
+            panel.prompt = "压缩到此处"
+            panel.message = "请选择压缩包存放目录"
+            if let first = req.sources.first {
+                panel.directoryURL = first.deletingLastPathComponent()
+            }
+            NSApp.activate(ignoringOtherApps: true)
+            let resp = panel.runModal()
+            guard resp == .OK, let targetDir = panel.url else { return }
+
+            let stem = FinderArchiveNaming.suggestedStem(for: req.sources)
+            let proposed = targetDir.appendingPathComponent("\(stem).zip")
+            let dest = ArchiveOutputFamily.collisionFreeBaseURL(for: proposed)
+
+            QuickActionProgressHUD.shared.show(
+                title: "正在压缩 \(dest.lastPathComponent)",
+                symbol: "folder.badge.plus"
+            )
+            do {
+                _ = try await createArchiveDirectly(sources: req.sources, destinationURL: dest, format: .zip) { frac in
+                    QuickActionProgressHUD.shared.update(progress: frac)
+                }
+                QuickActionProgressHUD.shared.finish(message: "已生成 \(dest.lastPathComponent)")
+            } catch {
+                QuickActionProgressHUD.shared.finish(message: "压缩失败: \(error.localizedDescription)")
+            }
+
         case .quickZIP:
+            hideAuxiliaryWindowsIfBrowsingInactive()
             if let dest = try? FinderArchiveNaming.availableZIPDestination(for: req.sources) {
-                await createArchive(sources: req.sources, destinationURL: dest, format: .zip)
+                QuickActionProgressHUD.shared.show(
+                    title: "正在压缩 \(dest.lastPathComponent)",
+                    symbol: "archivebox"
+                )
+                do {
+                    _ = try await createArchiveDirectly(sources: req.sources, destinationURL: dest, format: .zip) { frac in
+                        QuickActionProgressHUD.shared.update(progress: frac)
+                    }
+                    QuickActionProgressHUD.shared.finish(message: "已生成 \(dest.lastPathComponent)")
+                } catch {
+                    QuickActionProgressHUD.shared.finish(message: "压缩失败: \(error.localizedDescription)")
+                }
             }
         case .quick7Z:
+            hideAuxiliaryWindowsIfBrowsingInactive()
             if let firstURL = req.sources.first {
                 let (stem, _) = ArchiveOutputFamily.splitArchiveStemAndCompoundExtension(firstURL.lastPathComponent)
                 let targetStem = stem.isEmpty ? "Archive" : stem
                 let dest = firstURL.deletingLastPathComponent().appendingPathComponent("\(targetStem).7z")
                 let freeDest = ArchiveOutputFamily.collisionFreeBaseURL(for: dest)
-                await createArchive(sources: req.sources, destinationURL: freeDest, format: .sevenZip)
+                QuickActionProgressHUD.shared.show(
+                    title: "正在压缩 \(freeDest.lastPathComponent)",
+                    symbol: "archivebox"
+                )
+                do {
+                    _ = try await createArchiveDirectly(sources: req.sources, destinationURL: freeDest, format: .sevenZip) { frac in
+                        QuickActionProgressHUD.shared.update(progress: frac)
+                    }
+                    QuickActionProgressHUD.shared.finish(message: "已生成 \(freeDest.lastPathComponent)")
+                } catch {
+                    QuickActionProgressHUD.shared.finish(message: "压缩失败: \(error.localizedDescription)")
+                }
             }
         case .advancedCompression:
             creationSources = req.sources

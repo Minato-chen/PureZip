@@ -99,6 +99,128 @@ public struct ArchiveEntryRowIconView: View {
     }
 }
 
+private struct CapsuleEntryRowView: View {
+    let entry: ArchiveEntry
+    @ObservedObject var session: ArchiveBrowsingSession
+    let isSelected: Bool
+    let allowsEditing: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ArchiveEntryRowIconView(entry: entry)
+
+            Text(entry.name)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(isSelected ? .white : .primary)
+                .lineLimit(1)
+
+            Spacer()
+
+            if entry.type != .directory {
+                Text(ByteCountFormatter.string(fromByteCount: entry.uncompressedSize, countStyle: .file))
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(isSelected ? .white.opacity(0.85) : .secondary)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isSelected ? Color(red: 0.88, green: 0.60, blue: 0.05) : Color.clear)
+        )
+        .contentShape(Rectangle())
+        .id(entry.id)
+        .onTapGesture(count: 2) {
+            session.handleDoubleClick(on: entry)
+        }
+        .onTapGesture(count: 1) {
+            session.selectEntry(entry)
+        }
+        .onHover { isHovered in
+            HoverPreviewCoordinator.shared.onRowHover(entry: entry, isHovered: isHovered, session: session)
+        }
+        .onDrag {
+            ArchiveDragExportManager.shared.itemProvider(for: entry, session: session)
+        }
+        .contextMenu {
+            if entry.isNestedArchive {
+                Button {
+                    Task { await session.openNestedArchive(entry: entry) }
+                } label: {
+                    Label("进入内部压缩包浏览", systemImage: "arrow.right.doc.on.clipboard")
+                }
+
+                Button {
+                    Task { await session.extractNestedArchiveEntryDirectly(entry) }
+                } label: {
+                    Label("直接解压内部压缩包到同名文件夹", systemImage: "square.stack.3d.down.right")
+                }
+
+                Divider()
+            }
+
+            Button {
+                session.selectEntry(entry)
+                session.toggleQuickLookForSelected()
+            } label: {
+                Label("系统快速预览 (空格)", systemImage: "eye")
+            }
+
+            Button {
+                session.selectEntry(entry)
+                session.copySelectedEntry()
+            } label: {
+                Label("拷贝 (⌘C)", systemImage: "doc.on.doc")
+            }
+
+            if allowsEditing && (session.currentDescriptor?.capabilities.contains(.update) == true) {
+                Button {
+                    session.selectEntry(entry)
+                    session.duplicateSelectedEntry()
+                } label: {
+                    Label("创建副本 (⌘D)", systemImage: "plus.square.on.square")
+                }
+
+                Button {
+                    session.pasteFromClipboard()
+                } label: {
+                    Label("粘贴至此 (⌘V)", systemImage: "doc.on.clipboard")
+                }
+
+                Button {
+                    session.promptRename(for: entry)
+                } label: {
+                    Label("重命名... (Return)", systemImage: "pencil")
+                }
+            }
+
+            Divider()
+
+            let actions = PureActionsRouter.resolveActions(for: entry)
+            ForEach(actions) { act in
+                Button {
+                    Task {
+                        let msg = try? await PureActionsRouter.execute(action: act.kind, for: entry, session: session)
+                        session.statusMessage = msg ?? "已执行 \(act.title)"
+                    }
+                } label: {
+                    Label(act.title, systemImage: act.systemImage)
+                }
+            }
+
+            if allowsEditing && (session.currentDescriptor?.capabilities.contains(.update) == true) {
+                Divider()
+
+                Button(role: .destructive) {
+                    session.stageDelete(entries: [entry])
+                } label: {
+                    Label("从归档中删除", systemImage: "trash")
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Root Adaptive Window View
 
 public struct RootApplicationView: View {
@@ -149,6 +271,7 @@ public struct RootApplicationView: View {
         )) {
             if let sources = session.creationSources {
                 ArchiveCreationDialogView(sources: sources, session: session)
+                    .id(sources.map(\.path).joined(separator: "|"))
             }
         }
         .sheet(isPresented: $session.isShowingPasswordPrompt) {
@@ -160,7 +283,7 @@ public struct RootApplicationView: View {
         .quickLookPreview($session.quickLookItemURL)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
-        .onDrop(of: [.fileURL, .url], isTargeted: nil) { providers in
+        .onDrop(of: [.fileURL, .url, .item, .data], isTargeted: nil) { providers in
             handleDroppedProviders(providers)
         }
         .background(
@@ -233,38 +356,27 @@ public struct RootApplicationView: View {
             session.statusMessage = "当前 Pure Capsule 浮窗处于只读模式（可在设置中开启编辑权限）"
             return false
         }
-        if session.isBusy {
-            return false
+
+        // 1. Direct pasteboard check for Finder drag events (100% reliable for external disks, DMG, network volumes)
+        if let dragURLs = NSPasteboard(name: .drag).readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !dragURLs.isEmpty {
+            Task { @MainActor in
+                await handleDroppedURLs(dragURLs)
+            }
+            return true
         }
+        if let genURLs = NSPasteboard.general.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !genURLs.isEmpty {
+            Task { @MainActor in
+                await handleDroppedURLs(genURLs)
+            }
+            return true
+        }
+
+        // 2. Asynchronous NSItemProvider fallback
         Task {
             var urls: [URL] = []
             for provider in providers {
-                if provider.canLoadObject(ofClass: URL.self) {
-                    if let url = try? await withCheckedThrowingContinuation({ (continuation: CheckedContinuation<URL?, Error>) in
-                        _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                            continuation.resume(returning: url)
-                        }
-                    }) {
-                        urls.append(url)
-                    }
-                } else {
-                    if let url = try? await withCheckedThrowingContinuation({ (continuation: CheckedContinuation<URL?, Error>) in
-                        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-                            let resolvedURL: URL?
-                            if let u = item as? URL {
-                                resolvedURL = u
-                            } else if let data = item as? Data, let u = URL(dataRepresentation: data, relativeTo: nil) {
-                                resolvedURL = u
-                            } else if let str = item as? String {
-                                resolvedURL = URL(string: str)?.isFileURL == true ? URL(string: str) : URL(fileURLWithPath: str)
-                            } else {
-                                resolvedURL = nil
-                            }
-                            continuation.resume(returning: resolvedURL)
-                        }
-                    }) {
-                        urls.append(url)
-                    }
+                if let url = await Self.resolveURL(from: provider) {
+                    urls.append(url)
                 }
             }
             guard !urls.isEmpty else { return }
@@ -273,13 +385,95 @@ public struct RootApplicationView: View {
         return true
     }
 
+    private static func resolveURL(from provider: NSItemProvider) async -> URL? {
+        // Priority A: UTType.fileURL
+        if let url = await withCheckedContinuation({ (continuation: CheckedContinuation<URL?, Never>) in
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                continuation.resume(returning: Self.extractURL(from: item))
+            }
+        }) {
+            return url
+        }
+
+        // Priority B: "public.file-url" string identifier
+        if let url = await withCheckedContinuation({ (continuation: CheckedContinuation<URL?, Never>) in
+            provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, _ in
+                continuation.resume(returning: Self.extractURL(from: item))
+            }
+        }) {
+            return url
+        }
+
+        // Priority C: loadObject(ofClass: URL.self)
+        if provider.canLoadObject(ofClass: URL.self) {
+            if let url = await withCheckedContinuation({ (continuation: CheckedContinuation<URL?, Never>) in
+                _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                    continuation.resume(returning: url)
+                }
+            }) {
+                return url
+            }
+        }
+
+        // Priority D: UTType.item
+        if let url = await withCheckedContinuation({ (continuation: CheckedContinuation<URL?, Never>) in
+            provider.loadItem(forTypeIdentifier: UTType.item.identifier, options: nil) { item, _ in
+                continuation.resume(returning: Self.extractURL(from: item))
+            }
+        }) {
+            return url
+        }
+
+        return nil
+    }
+
+    private static func extractURL(from item: NSSecureCoding?) -> URL? {
+        if let u = item as? URL {
+            return u
+        } else if let data = item as? Data {
+            if let u = URL(dataRepresentation: data, relativeTo: nil) {
+                return u
+            }
+            if let str = String(data: data, encoding: .utf8) {
+                return URL(string: str)?.isFileURL == true ? URL(string: str) : URL(fileURLWithPath: str)
+            }
+        } else if let str = item as? String {
+            return URL(string: str)?.isFileURL == true ? URL(string: str) : URL(fileURLWithPath: str)
+        }
+        return nil
+    }
+
     @MainActor
     private func handleDroppedURLs(_ urls: [URL]) async {
         guard !urls.isEmpty else { return }
 
-        // Case 1: An archive is ALREADY OPEN in the desk!
-        // Dragging ANY file(s) into an open archive means ADDING them to the current archive!
-        if session.currentArchiveURL != nil {
+        // If the dropped item(s) are archive files, or if current archive failed to load / is empty, OPEN them!
+        let droppedArchives = urls.filter { ArchiveFormatDescriptor.detect(at: $0).format != .unknown }
+        if session.currentArchiveURL == nil || session.displayedEntries.isEmpty || session.lastLoadError != nil || (urls.count == 1 && !droppedArchives.isEmpty) {
+            let dedupedArchives = ArchiveVolumeFamily.deduplicatedPrimaryArchives(from: droppedArchives)
+            if !dedupedArchives.isEmpty {
+                if dedupedArchives.count == 1, let first = dedupedArchives.first {
+                    await session.openArchive(at: first)
+                    return
+                } else {
+                    BatchExtractionManager.shared.startBatch(urls: dedupedArchives)
+                    if let first = dedupedArchives.first {
+                        await session.openArchive(at: first)
+                    }
+                    return
+                }
+            } else if urls.allSatisfy({ ArchiveVolumeFamily.isSplitArchive(at: $0) }) {
+                let primary = ArchiveVolumeFamily.deduplicatedPrimaryArchives(from: urls)
+                if let first = primary.first {
+                    await session.openArchive(at: first)
+                    return
+                }
+            }
+        }
+
+        // Case 1: An archive is ALREADY OPEN and loaded with entries.
+        // Dragging regular files into the open archive means ADDING them!
+        if session.currentArchiveURL != nil && !session.displayedEntries.isEmpty {
             if session.isCapsuleMode && !PureZipPreferences.shared.capsuleWindowAllowEditing {
                 session.statusMessage = "当前 Pure Capsule 浮窗处于只读模式（可在设置中开启编辑权限）"
                 return
@@ -292,57 +486,16 @@ public struct RootApplicationView: View {
             return
         }
 
-        // Case 2: Welcome screen / No open archive.
-        let dedupedArchives = ArchiveVolumeFamily.deduplicatedPrimaryArchives(from: urls.filter { ArchiveFormatDescriptor.detect(at: $0).format != .unknown })
-        if !dedupedArchives.isEmpty && dedupedArchives.count == urls.count {
-            // All dropped files are archives
-            if dedupedArchives.count == 1, let first = dedupedArchives.first {
-                await session.openArchive(at: first)
-                return
-            } else {
-                BatchExtractionManager.shared.startBatch(urls: dedupedArchives)
-                if let first = dedupedArchives.first {
-                    await session.openArchive(at: first)
-                }
-                return
-            }
-        } else if dedupedArchives.count == 1 && urls.allSatisfy({ ArchiveVolumeFamily.isSplitArchive(at: $0) }) {
-            // Dropped split members of a single split family
-            if let first = dedupedArchives.first {
-                await session.openArchive(at: first)
-                return
-            }
-        }
-
-        // Case 3: Dropping regular files to Welcome screen stages them in Pure Shelf!
-        session.addToShelf(urls)
+        // Case 2: Dropping regular files to Pure Desk opens archive creation dialog!
+        session.creationSources = urls
     }
 }
 
-// MARK: - 1. Screen 1: 随航搁板 / 欢迎首页 (Pure Shelf Main)
+// MARK: - 1. Screen 1: 起航工作台 / 欢迎首页 (Pure Desk Main)
 
 public struct PureZipWelcomeView: View {
     @ObservedObject var session: ArchiveBrowsingSession
     @Environment(\.colorScheme) private var colorScheme
-
-    private var totalShelfSizeString: String {
-        var total: Int64 = 0
-        for url in session.shelfItems {
-            if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-               let sz = attrs[.size] as? Int64 {
-                total += sz
-            }
-        }
-        return ByteCountFormatter.string(fromByteCount: total, countStyle: .file)
-    }
-
-    private func fileSizeString(for url: URL) -> String {
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-              let sz = attrs[.size] as? Int64 else {
-            return "--"
-        }
-        return ByteCountFormatter.string(fromByteCount: sz, countStyle: .file)
-    }
 
     public var body: some View {
         ZStack {
@@ -366,12 +519,12 @@ public struct PureZipWelcomeView: View {
 
                     Spacer()
 
-                    PureZipBrandBadgeView("Shelf", logoSize: 28)
+                    PureZipBrandBadgeView("Desk", logoSize: 28)
 
                     Spacer()
 
                     HStack(spacing: 8) {
-                        // Pin on top toggle button (Pure Shelf Main)
+                        // Pin on top toggle button
                         Button {
                             session.isPinnedOnTop.toggle()
                         } label: {
@@ -387,7 +540,7 @@ public struct PureZipWelcomeView: View {
                         .help(session.isPinnedOnTop ? "取消窗口置顶" : "置顶当前窗口")
 
                         Button {
-                            session.openSettings(tab: .pureShelf)
+                            session.openSettings(tab: .general)
                         } label: {
                             Image(systemName: "gearshape")
                                 .font(.system(size: 13, weight: .semibold))
@@ -405,201 +558,108 @@ public struct PureZipWelcomeView: View {
                 .padding(.horizontal, 18)
                 .padding(.top, 24)
 
-                if session.shelfItems.isEmpty {
-                    // Empty Welcome State
-                    Spacer()
+                Spacer()
 
-                    VStack(spacing: 12) {
-                        Image(systemName: "tray.and.arrow.down")
-                            .font(.system(size: 64, weight: .ultraLight))
-                            .foregroundStyle(colorScheme == .dark ? Color(white: 0.45) : Color(white: 0.60))
+                // Center Welcome Artwork & Actions
+                VStack(spacing: 12) {
+                    Image(systemName: "tray.and.arrow.down")
+                        .font(.system(size: 64, weight: .ultraLight))
+                        .foregroundStyle(colorScheme == .dark ? Color(white: 0.45) : Color(white: 0.60))
 
-                        Text("欢迎！拖入文件以开始")
-                            .font(.system(size: 26, weight: .bold))
-                            .foregroundStyle(.primary)
+                    Text("欢迎使用 PureDesk")
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(.primary)
 
-                        Text("拖入压缩包直接浏览，或拖入文件暂存打包")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.bottom, 24)
+                    Text("拖入压缩包直接浏览，或拖入文件快速打包")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.bottom, 24)
 
-                    // Dual Pill Action Buttons
-                    HStack(spacing: 18) {
-                        Button {
-                            promptOpenArchive()
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "folder")
-                                    .font(.system(size: 14))
-                                Text("打开压缩包")
-                                    .font(.system(size: 14, weight: .medium))
-                            }
-                            .foregroundStyle(.primary)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 11)
-                            .background(colorScheme == .dark ? Color(white: 0.22) : Color.white)
-                            .cornerRadius(22)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 22)
-                                    .stroke(colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08), lineWidth: 1)
-                            )
-                            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.35 : 0.06), radius: 6, y: 2)
+                // Dual Pill Action Buttons
+                HStack(spacing: 18) {
+                    Button {
+                        promptOpenArchive()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "folder")
+                                .font(.system(size: 14))
+                            Text("打开压缩包")
+                                .font(.system(size: 14, weight: .medium))
                         }
-                        .buttonStyle(.plain)
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 11)
+                        .background(colorScheme == .dark ? Color(white: 0.22) : Color.white)
+                        .cornerRadius(22)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 22)
+                                .stroke(colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08), lineWidth: 1)
+                        )
+                        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.35 : 0.06), radius: 6, y: 2)
+                    }
+                    .buttonStyle(.plain)
 
-                        Button {
-                            promptCreateArchive()
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 14, weight: .bold))
-                            }
+                    Button {
+                        promptCreateArchive()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 14, weight: .bold))
                             Text("创建压缩包")
                                 .font(.system(size: 14, weight: .medium))
                         }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 11)
-                        .background(
-                            LinearGradient(
-                                colors: [Color(red: 0.05, green: 0.48, blue: 0.98), Color(red: 0.02, green: 0.36, blue: 0.85)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .cornerRadius(22)
-                        .shadow(color: Color(red: 0.05, green: 0.48, blue: 0.98).opacity(0.40), radius: 8, y: 3)
-                        .buttonStyle(.plain)
                     }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 11)
+                    .background(
+                        LinearGradient(
+                            colors: [Color(red: 0.05, green: 0.48, blue: 0.98), Color(red: 0.02, green: 0.36, blue: 0.85)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .cornerRadius(22)
+                    .shadow(color: Color(red: 0.05, green: 0.48, blue: 0.98).opacity(0.40), radius: 8, y: 3)
+                    .buttonStyle(.plain)
+                }
 
-                    Spacer()
-                } else {
-                    // Populated Shelf State in Main Window (Matching Bar experience)
-                    VStack(spacing: 0) {
-                        Spacer().frame(height: 12)
+                // Recent Archives Section
+                if !session.recentArchives.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("最近打开")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.secondary)
 
-                        // Inner Shelf Card Container
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(colorScheme == .dark ? Color(white: 0.16) : Color(white: 0.93))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .stroke(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06), lineWidth: 1)
-                                )
+                            Spacer()
 
-                            VStack(spacing: 0) {
-                                ScrollView {
-                                    LazyVStack(spacing: 8) {
-                                        ForEach(session.shelfItems, id: \.self) { url in
-                                            HStack(spacing: 10) {
-                                                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
-                                                    .resizable()
-                                                    .frame(width: 24, height: 24)
+                            Button("清除历史") {
+                                session.recentArchives.removeAll()
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 4)
 
-                                                VStack(alignment: .leading, spacing: 2) {
-                                                    Text(url.lastPathComponent)
-                                                        .font(.system(size: 13, weight: .medium))
-                                                        .foregroundStyle(.primary)
-                                                        .lineLimit(1)
-
-                                                    Text(fileSizeString(for: url))
-                                                        .font(.system(size: 11))
-                                                        .foregroundStyle(.secondary)
-                                                }
-
-                                                Spacer()
-
-                                                Button {
-                                                    session.removeFromShelf(url)
-                                                } label: {
-                                                    Image(systemName: "xmark.circle.fill")
-                                                        .font(.system(size: 14))
-                                                        .foregroundStyle(.secondary)
-                                                }
-                                                .buttonStyle(.plain)
-                                            }
-                                            .padding(.horizontal, 14)
-                                            .padding(.vertical, 8)
-                                            .background(colorScheme == .dark ? Color(white: 0.22) : Color.white)
-                                            .cornerRadius(10)
-                                            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.25 : 0.04), radius: 4, y: 1)
-                                        }
+                        ScrollView(.vertical, showsIndicators: false) {
+                            LazyVStack(spacing: 6) {
+                                ForEach(session.recentArchives.prefix(6), id: \.self) { url in
+                                    RecentArchiveCard(url: url) {
+                                        Task { await session.openArchive(at: url) }
                                     }
-                                    .padding(12)
                                 }
-
-                                Divider()
-
-                                // Shelf Bottom Dock
-                                HStack {
-                                    Text("共 \(session.shelfItems.count) 项 (\(totalShelfSizeString))")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundStyle(.secondary)
-
-                                    Spacer()
-
-                                    Button("打开压缩包") {
-                                        promptOpenArchive()
-                                    }
-                                    .font(.system(size: 12))
-                                    .buttonStyle(.plain)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(colorScheme == .dark ? Color(white: 0.24) : Color.white)
-                                    .foregroundStyle(.primary)
-                                    .cornerRadius(7)
-
-                                    Button("清空") {
-                                        session.clearShelf()
-                                    }
-                                    .font(.system(size: 12))
-                                    .buttonStyle(.plain)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(colorScheme == .dark ? Color(white: 0.24) : Color.white)
-                                    .foregroundStyle(.primary)
-                                    .cornerRadius(7)
-
-                                    if session.shelfItems.contains(where: { ArchiveFormatDescriptor.detect(at: $0).format != .unknown }) {
-                                        Button("快速解压") {
-                                            session.quickExtractShelfArchives()
-                                        }
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .buttonStyle(.plain)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 5)
-                                        .background(colorScheme == .dark ? Color(white: 0.24) : Color.white)
-                                        .foregroundStyle(Color(red: 0.22, green: 0.62, blue: 1.0))
-                                        .cornerRadius(7)
-                                    }
-
-                                    Button("打包") {
-                                        session.quickPackageShelf()
-                                    }
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .buttonStyle(.plain)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 5)
-                                    .background(
-                                        LinearGradient(
-                                            colors: [Color(red: 0.05, green: 0.48, blue: 0.98), Color(red: 0.02, green: 0.36, blue: 0.85)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                    .foregroundStyle(.white)
-                                    .clipShape(Capsule())
-                                }
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                                .background(colorScheme == .dark ? Color(white: 0.13) : Color(white: 0.89))
                             }
                         }
-                        .padding(.horizontal, 18)
-                        .padding(.bottom, 18)
+                        .frame(maxHeight: 180)
                     }
+                    .padding(.horizontal, 40)
+                    .padding(.top, 28)
                 }
+
+                Spacer()
             }
         }
         .frame(minWidth: 380, maxWidth: .infinity, minHeight: 380, maxHeight: .infinity)
@@ -640,6 +700,56 @@ public struct PureZipWelcomeView: View {
         if panel.runModal() == .OK, !panel.urls.isEmpty {
             session.creationSources = panel.urls
         }
+    }
+}
+
+// MARK: - Recent Archive Card for Pure Desk
+
+private struct RecentArchiveCard: View {
+    let url: URL
+    let onOpen: () -> Void
+    @State private var isHovered = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Button(action: onOpen) {
+            HStack(spacing: 10) {
+                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                    .resizable()
+                    .frame(width: 20, height: 20)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(url.lastPathComponent)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Text(url.deletingLastPathComponent().path)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.right.circle")
+                    .font(.system(size: 13))
+                    .foregroundStyle(isHovered ? Color(red: 0.05, green: 0.48, blue: 0.98) : .secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isHovered ? (colorScheme == .dark ? Color(white: 0.22) : Color(white: 0.92)) : (colorScheme == .dark ? Color(white: 0.17) : Color.white))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.05), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
     }
 }
 
@@ -1320,6 +1430,32 @@ public struct CapsuleArchiveWindowView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.bottom, 56)
+                } else if let errorMsg = session.lastLoadError, session.displayedEntries.isEmpty {
+                    VStack(spacing: 12) {
+                        Spacer()
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 34))
+                            .foregroundStyle(Color.orange)
+                        Text("归档载入未完成")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.primary)
+                        Text(errorMsg)
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 28)
+                        if let currentURL = session.currentArchiveURL {
+                            Button("重新尝试载入") {
+                                Task { await session.openArchive(at: currentURL) }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            .padding(.top, 4)
+                        }
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.bottom, 60)
                 } else if session.displayedEntries.isEmpty {
                     VStack(spacing: 12) {
                         Spacer()
@@ -1342,128 +1478,31 @@ public struct CapsuleArchiveWindowView: View {
                     .padding(.bottom, 60)
                 } else {
                     // List of Entries
-                    ScrollView {
-                    LazyVStack(spacing: 2) {
-                        ForEach(session.displayedEntries) { entry in
-                            let isSelected = session.selectedEntryID == entry.id
-                            HStack(spacing: 10) {
-                                ArchiveEntryRowIconView(entry: entry)
-
-                                Text(entry.name)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(isSelected ? .white : .primary)
-                                    .lineLimit(1)
-
-                                Spacer()
-
-                                if entry.type != .directory {
-                                    Text(ByteCountFormatter.string(fromByteCount: entry.uncompressedSize, countStyle: .file))
-                                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                                        .foregroundStyle(isSelected ? .white.opacity(0.85) : .secondary)
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            LazyVStack(spacing: 2) {
+                                ForEach(session.displayedEntries) { entry in
+                                    CapsuleEntryRowView(
+                                        entry: entry,
+                                        session: session,
+                                        isSelected: session.selectedEntryID == entry.id,
+                                        allowsEditing: prefs.capsuleWindowAllowEditing
+                                    )
                                 }
                             }
+                            .id("capsule-entries-\(session.currentArchiveURL?.path ?? "")-\(session.indexRevision)-\(session.currentDirectoryPath)-\(prefs.capsuleWindowAllowEditing)")
                             .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(isSelected ? Color(red: 0.88, green: 0.60, blue: 0.05) : Color.clear)
-                            )
-                            .contentShape(Rectangle())
-                            .onTapGesture(count: 2) {
-                                session.handleDoubleClick(on: entry)
-                            }
-                            .onTapGesture(count: 1) {
-                                session.selectEntry(entry)
-                            }
-                            .onHover { isHovered in
-                                HoverPreviewCoordinator.shared.onRowHover(entry: entry, isHovered: isHovered, session: session)
-                            }
-                            .onDrag {
-                                ArchiveDragExportManager.shared.itemProvider(for: entry, session: session)
-                            }
-                            .contextMenu {
-                                if entry.isNestedArchive {
-                                    Button {
-                                        Task { await session.openNestedArchive(entry: entry) }
-                                    } label: {
-                                        Label("进入内部压缩包浏览", systemImage: "arrow.right.doc.on.clipboard")
-                                    }
-
-                                    Button {
-                                        Task { await session.extractNestedArchiveEntryDirectly(entry) }
-                                    } label: {
-                                        Label("直接解压内部压缩包到同名文件夹", systemImage: "square.stack.3d.down.right")
-                                    }
-
-                                    Divider()
-                                }
-
-                                Button {
-                                    session.selectEntry(entry)
-                                    session.toggleQuickLookForSelected()
-                                } label: {
-                                    Label("系统快速预览 (空格)", systemImage: "eye")
-                                }
-
-                                Button {
-                                    session.selectEntry(entry)
-                                    session.copySelectedEntry()
-                                } label: {
-                                    Label("拷贝 (⌘C)", systemImage: "doc.on.doc")
-                                }
-
-                                if prefs.capsuleWindowAllowEditing && (session.currentDescriptor?.capabilities.contains(.update) == true) {
-                                    Button {
-                                        session.selectEntry(entry)
-                                        session.duplicateSelectedEntry()
-                                    } label: {
-                                        Label("创建副本 (⌘D)", systemImage: "plus.square.on.square")
-                                    }
-
-                                    Button {
-                                        session.pasteFromClipboard()
-                                    } label: {
-                                        Label("粘贴至此 (⌘V)", systemImage: "doc.on.clipboard")
-                                    }
-
-                                    Button {
-                                        session.promptRename(for: entry)
-                                    } label: {
-                                        Label("重命名... (Return)", systemImage: "pencil")
-                                    }
-                                }
-
-                                Divider()
-
-                                let actions = PureActionsRouter.resolveActions(for: entry)
-                                ForEach(actions) { act in
-                                    Button {
-                                        Task {
-                                            let msg = try? await PureActionsRouter.execute(action: act.kind, for: entry, session: session)
-                                            session.statusMessage = msg ?? "已执行 \(act.title)"
-                                        }
-                                    } label: {
-                                        Label(act.title, systemImage: act.systemImage)
-                                    }
-                                }
-
-                                if prefs.capsuleWindowAllowEditing && (session.currentDescriptor?.capabilities.contains(.update) == true) {
-                                    Divider()
-
-                                    Button(role: .destructive) {
-                                        session.stageDelete(entries: [entry])
-                                    } label: {
-                                        Label("从归档中删除", systemImage: "trash")
-                                    }
+                            .padding(.bottom, 82) // ample clearance for floating bottom bar
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .onChange(of: session.selectedEntryID) { _, newID in
+                            if let id = newID {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    proxy.scrollTo(id, anchor: nil)
                                 }
                             }
                         }
                     }
-                    .id("capsule-entries-\(session.currentArchiveURL?.path ?? "")-\(session.indexRevision)-\(session.currentDirectoryPath)-\(prefs.capsuleWindowAllowEditing)")
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 82) // ample clearance for floating bottom bar
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
 
@@ -2089,51 +2128,53 @@ public struct CompleteDeskView: View {
                         Divider()
 
                         // Table Rows
-                        ScrollView {
-                            LazyVStack(spacing: 2) {
-                                ForEach(session.displayedEntries) { entry in
-                                    let isSelected = session.selectedEntryID == entry.id
-                                    HStack {
-                                        HStack(spacing: 10) {
-                                            ArchiveEntryRowIconView(entry: entry)
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                LazyVStack(spacing: 2) {
+                                    ForEach(session.displayedEntries) { entry in
+                                        let isSelected = session.selectedEntryID == entry.id
+                                        HStack {
+                                            HStack(spacing: 10) {
+                                                ArchiveEntryRowIconView(entry: entry)
 
-                                            Text(entry.name)
-                                                .font(.system(size: 13, weight: .medium))
-                                                .foregroundStyle(isSelected ? .white : .primary)
-                                                .lineLimit(1)
+                                                Text(entry.name)
+                                                    .font(.system(size: 13, weight: .medium))
+                                                    .foregroundStyle(isSelected ? .white : .primary)
+                                                    .lineLimit(1)
+                                            }
+
+                                            Spacer()
+
+                                            Text(entry.type == .directory ? "--" : ByteCountFormatter.string(fromByteCount: entry.uncompressedSize, countStyle: .file))
+                                                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                                .foregroundStyle(isSelected ? .white : .secondary)
+                                                .frame(width: 100, alignment: .leading)
+
+                                            Text(entryDateFormatted(entry: entry))
+                                                .font(.system(size: 12, design: .monospaced))
+                                                .foregroundStyle(isSelected ? .white : .secondary)
+                                                .frame(width: 180, alignment: .leading)
                                         }
-
-                                        Spacer()
-
-                                        Text(entry.type == .directory ? "--" : ByteCountFormatter.string(fromByteCount: entry.uncompressedSize, countStyle: .file))
-                                            .font(.system(size: 12, weight: .medium, design: .monospaced))
-                                            .foregroundStyle(isSelected ? .white : .secondary)
-                                            .frame(width: 100, alignment: .leading)
-
-                                        Text(entryDateFormatted(entry: entry))
-                                            .font(.system(size: 12, design: .monospaced))
-                                            .foregroundStyle(isSelected ? .white : .secondary)
-                                            .frame(width: 180, alignment: .leading)
-                                    }
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 7)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .fill(isSelected ? Color.accentColor : Color.clear)
-                                    )
-                                    .contentShape(Rectangle())
-                                    .onHover { isHovered in
-                                        HoverPreviewCoordinator.shared.onRowHover(entry: entry, isHovered: isHovered, session: session)
-                                    }
-                                    .onDrag {
-                                        ArchiveDragExportManager.shared.itemProvider(for: entry, session: session)
-                                    }
-                                    .onTapGesture(count: 2) {
-                                        session.handleDoubleClick(on: entry)
-                                    }
-                                    .onTapGesture(count: 1) {
-                                        session.selectEntry(entry)
-                                    }
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 7)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .fill(isSelected ? Color.accentColor : Color.clear)
+                                        )
+                                        .contentShape(Rectangle())
+                                        .id(entry.id)
+                                        .onHover { isHovered in
+                                            HoverPreviewCoordinator.shared.onRowHover(entry: entry, isHovered: isHovered, session: session)
+                                        }
+                                        .onDrag {
+                                            ArchiveDragExportManager.shared.itemProvider(for: entry, session: session)
+                                        }
+                                        .onTapGesture(count: 2) {
+                                            session.handleDoubleClick(on: entry)
+                                        }
+                                        .onTapGesture(count: 1) {
+                                            session.selectEntry(entry)
+                                        }
                                     .contextMenu {
                                         if entry.isNestedArchive {
                                             Button {
@@ -2212,6 +2253,14 @@ public struct CompleteDeskView: View {
                             .padding(.top, 4)
                             .padding(.bottom, 80) // Dock breathing room
                         }
+                        .onChange(of: session.selectedEntryID) { _, newID in
+                            if let id = newID {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    proxy.scrollTo(id, anchor: nil)
+                                }
+                            }
+                        }
+                    }
                     }
                 }
 
@@ -2631,12 +2680,12 @@ public struct CompleteDeskView: View {
                     .padding(.horizontal, 20)
                 } else if let mediaURL = preview.mediaFileURL, let vData = preview.videoMetadata {
                     // Video Interactive Player in Inspector
-                    InspectorVideoPlayerView(url: mediaURL, metadata: vData, entryName: preview.entry.name)
+                    InspectorVideoPlayerView(url: mediaURL, metadata: vData, entryName: preview.entry.name, session: session)
                         .id(mediaURL)
                         .padding(.horizontal, 20)
                 } else if let mediaURL = preview.mediaFileURL, let aData = preview.audioMetadata {
                     // Audio Interactive Waveform Player in Inspector
-                    InspectorAudioPlayerView(url: mediaURL, metadata: aData, entryName: preview.entry.name)
+                    InspectorAudioPlayerView(url: mediaURL, metadata: aData, entryName: preview.entry.name, session: session)
                         .id(mediaURL)
                 } else {
                     // Large Card with Rendered Thumbnail Preview (Images, 3D, PDF, Text, Folders)
@@ -2978,6 +3027,17 @@ public struct MenuBarShelfView: View {
                                     .background(colorScheme == .dark ? Color(white: 0.22) : Color.white)
                                     .cornerRadius(8)
                                     .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.20 : 0.04), radius: 3, y: 1)
+                                    .onDrag {
+                                        makeShelfItemProvider(for: url)
+                                    }
+                                    .contextMenu {
+                                        Button("在访达中显示") {
+                                            NSWorkspace.shared.activateFileViewerSelecting([url])
+                                        }
+                                        Button("从暂存盒移出") {
+                                            session.removeFromShelf(url)
+                                        }
+                                    }
                                 }
                             }
                             .padding(10)
@@ -2992,46 +3052,49 @@ public struct MenuBarShelfView: View {
 
                             Spacer()
 
-                            Button("清空") {
-                                session.clearShelf()
-                            }
-                            .font(.system(size: 11))
-                            .buttonStyle(.plain)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(colorScheme == .dark ? Color(white: 0.24) : Color.white)
-                            .foregroundStyle(.primary)
-                            .cornerRadius(6)
+                            if session.isBusy {
+                                HStack(spacing: 6) {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                    if let frac = session.progressFraction, frac > 0 {
+                                        Text("\(Int(frac * 100))%")
+                                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                            .foregroundStyle(.secondary)
+                                    } else {
+                                        Text("处理中...")
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            } else {
+                                Button("清空") {
+                                    session.clearShelf()
+                                }
+                                .font(.system(size: 11))
+                                .buttonStyle(.plain)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(colorScheme == .dark ? Color(white: 0.24) : Color.white)
+                                .foregroundStyle(.primary)
+                                .cornerRadius(6)
 
-                            if session.shelfItems.contains(where: { ArchiveFormatDescriptor.detect(at: $0).format != .unknown }) {
-                                Button("快速解压") {
-                                    session.quickExtractShelfArchives()
+                                Button("打包") {
+                                    session.quickPackageShelf()
                                 }
                                 .font(.system(size: 11, weight: .semibold))
                                 .buttonStyle(.plain)
-                                .padding(.horizontal, 9)
+                                .padding(.horizontal, 12)
                                 .padding(.vertical, 4)
-                                .background(colorScheme == .dark ? Color(white: 0.24) : Color.white)
-                                .foregroundStyle(Color(red: 0.22, green: 0.62, blue: 1.0))
-                                .cornerRadius(6)
-                            }
-
-                            Button("打包") {
-                                session.quickPackageShelf()
-                            }
-                            .font(.system(size: 11, weight: .semibold))
-                            .buttonStyle(.plain)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 4)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color(red: 0.05, green: 0.48, blue: 0.98), Color(red: 0.02, green: 0.36, blue: 0.85)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color(red: 0.05, green: 0.48, blue: 0.98), Color(red: 0.02, green: 0.36, blue: 0.85)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
                                 )
-                            )
-                            .foregroundStyle(.white)
-                            .clipShape(Capsule())
+                                .foregroundStyle(.white)
+                                .clipShape(Capsule())
+                            }
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
@@ -3131,5 +3194,37 @@ public struct MenuBarShelfView: View {
             }
         }
         return true
+    }
+
+    private func makeShelfItemProvider(for url: URL) -> NSItemProvider {
+        let provider = NSItemProvider(object: url as NSURL)
+        provider.suggestedName = url.lastPathComponent
+
+        let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+        let ext = url.pathExtension.lowercased()
+        let typeID: String
+        if isDir {
+            typeID = UTType.folder.identifier
+        } else if let ut = UTType(filenameExtension: ext) {
+            typeID = ut.identifier
+        } else {
+            typeID = UTType.data.identifier
+        }
+
+        provider.registerFileRepresentation(
+            forTypeIdentifier: typeID,
+            fileOptions: [],
+            visibility: .all
+        ) { completion in
+            completion(url, false, nil)
+            DispatchQueue.main.async {
+                if PureZipPreferences.shared.pureShelfRemoveOnDragOut {
+                    session.removeFromShelf(url)
+                }
+            }
+            return Progress(totalUnitCount: 1)
+        }
+
+        return provider
     }
 }

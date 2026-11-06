@@ -108,7 +108,7 @@ public final class PureZipStatusItemController: NSObject, NSMenuDelegate, NSPopo
     }
 
     public func syncPopoverAppearance() {
-        let appearance = PureZipPreferences.shared.effectiveNSAppearance
+        let appearance = PureZipPreferences.shared.resolvedNSAppearance
         popover?.appearance = appearance
         if let window = popover?.contentViewController?.view.window {
             window.appearance = appearance
@@ -244,17 +244,28 @@ public final class PureZipStatusItemController: NSObject, NSMenuDelegate, NSPopo
     private func showContextMenu(sender: NSStatusBarButton) {
         let menu = NSMenu(title: "PureZip")
         menu.delegate = self
+        // 确保显式指定已解析的外观（避免跟随状态栏按钮继承深色菜单栏外观，导致在浅色窗口上白底白字无法看清）
+        menu.appearance = PureZipPreferences.shared.resolvedNSAppearance
 
         let openMainItem = NSMenuItem(title: "打开主窗口", action: #selector(openMainWindowAction), keyEquivalent: "1")
         openMainItem.target = self
+        if #available(macOS 11.0, *) {
+            openMainItem.image = NSImage(systemSymbolName: "macwindow", accessibilityDescription: nil)
+        }
         menu.addItem(openMainItem)
 
         let openBoxItem = NSMenuItem(title: "打开 Pure Shelf", action: #selector(openPureShelfAction), keyEquivalent: "")
         openBoxItem.target = self
+        if #available(macOS 11.0, *) {
+            openBoxItem.image = NSImage(systemSymbolName: "shippingbox", accessibilityDescription: nil)
+        }
         menu.addItem(openBoxItem)
 
         let settingsItem = NSMenuItem(title: "偏好设置...", action: #selector(openSettingsAction), keyEquivalent: ",")
         settingsItem.target = self
+        if #available(macOS 11.0, *) {
+            settingsItem.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
+        }
         menu.addItem(settingsItem)
 
         if !session.shelfItems.isEmpty {
@@ -265,6 +276,9 @@ public final class PureZipStatusItemController: NSObject, NSMenuDelegate, NSPopo
                 keyEquivalent: ""
             )
             clearItem.target = self
+            if #available(macOS 11.0, *) {
+                clearItem.image = NSImage(systemSymbolName: "trash", accessibilityDescription: nil)
+            }
             menu.addItem(clearItem)
         }
 
@@ -272,6 +286,9 @@ public final class PureZipStatusItemController: NSObject, NSMenuDelegate, NSPopo
 
         let aboutItem = NSMenuItem(title: "关于 PureZip", action: #selector(openAboutAction), keyEquivalent: "")
         aboutItem.target = self
+        if #available(macOS 11.0, *) {
+            aboutItem.image = NSImage(systemSymbolName: "info.circle", accessibilityDescription: nil)
+        }
         menu.addItem(aboutItem)
 
         menu.addItem(NSMenuItem.separator())
@@ -279,10 +296,13 @@ public final class PureZipStatusItemController: NSObject, NSMenuDelegate, NSPopo
         // 核心要求：右键退出选项 (Quit PureZip)
         let quitItem = NSMenuItem(title: "退出 PureZip", action: #selector(quitAppAction), keyEquivalent: "q")
         quitItem.target = self
+        if #available(macOS 11.0, *) {
+            quitItem.image = NSImage(systemSymbolName: "power", accessibilityDescription: nil)
+        }
         menu.addItem(quitItem)
 
         sender.highlight(true)
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 4), in: sender)
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height), in: sender)
         sender.highlight(false)
         sender.isHighlighted = false
         statusItem?.menu = nil

@@ -43,6 +43,7 @@ public struct FinderActionRequest: Codable, Sendable, Equatable {
         case quickZIP
         case quick7Z
         case advancedCompression
+        case quickCompressTo
         case quickExtractToNamedFolder
         case quickExtractHere
         case quickExtractTo

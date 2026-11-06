@@ -135,8 +135,10 @@ public struct ZIPEngine: ArchiveEngine {
         password: String? = nil,
         progress: (@Sendable (ArchiveTaskProgress) -> Void)? = nil
     ) async throws {
-        let data = try Data(contentsOf: url, options: .mappedIfSafe)
-        let parsed = try Self.parseCentralDirectory(from: data)
+        let parsed = try Self.parseCentralDirectory(at: url)
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+
         let selectedPaths: Set<String>? = entries.isEmpty
             ? nil
             : Set(entries.map { ArchiveBrowserProjection.canonicalDirectoryPath($0.path) })
@@ -169,7 +171,7 @@ public struct ZIPEngine: ArchiveEngine {
             }
 
             try fm.createDirectory(at: targetURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let payload = try Self.extractRecordPayload(rec, from: data)
+            let payload = try Self.extractRecordPayload(rec, from: handle)
 
             if rec.entry.type == .symbolicLink {
                 let linkTarget = String(data: payload, encoding: .utf8) ?? rec.entry.linkTarget ?? ""
@@ -258,21 +260,87 @@ public struct ZIPEngine: ArchiveEngine {
     }
 
     public func test(_ url: URL, password: String? = nil) async throws {
-        let data = try Data(contentsOf: url, options: .mappedIfSafe)
-        let parsed = try Self.parseCentralDirectory(from: data)
+        let parsed = try Self.parseCentralDirectory(at: url)
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
         for rec in parsed.records where rec.entry.type == .file {
             if rec.entry.encrypted {
                 throw ArchiveEngineError.wrongPassword
             }
-            _ = try Self.extractRecordPayload(rec, from: data)
+            _ = try Self.extractRecordPayload(rec, from: handle)
         }
     }
 
     // MARK: - Central Directory & Local Header Binary Parser
 
     internal static func parseCentralDirectory(at url: URL) throws -> ParsedCentralDirectory {
-        let data = try Data(contentsOf: url, options: .mappedIfSafe)
-        return try parseCentralDirectory(from: data)
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+
+        let fileSize = try handle.seekToEnd()
+        guard fileSize >= 22 else {
+            throw ArchiveEngineError.invalidArchive("File smaller than minimum ZIP EOCD (22 bytes)")
+        }
+
+        let tailSearchSize = min(fileSize, UInt64(22 + 65535 + 128))
+        let tailOffset = fileSize - tailSearchSize
+        try handle.seek(toOffset: tailOffset)
+        let tailData = handle.readData(ofLength: Int(tailSearchSize))
+
+        var eocdOffsetInTail: Int?
+        var pos = tailData.count - 22
+        while pos >= 0 {
+            if readUInt32LE(tailData, at: pos) == 0x0605_4B50 {
+                eocdOffsetInTail = pos
+                break
+            }
+            pos -= 1
+        }
+
+        guard let eocdPos = eocdOffsetInTail else {
+            throw ArchiveEngineError.invalidArchive("Missing End of Central Directory record (0x06054B50)")
+        }
+
+        var totalEntries = UInt64(readUInt16LE(tailData, at: eocdPos + 10))
+        var cdSize = UInt64(readUInt32LE(tailData, at: eocdPos + 12))
+        var cdOffset = UInt64(readUInt32LE(tailData, at: eocdPos + 16))
+        let commentLen = Int(readUInt16LE(tailData, at: eocdPos + 20))
+
+        var archiveComment: String?
+        if commentLen > 0, eocdPos + 22 + commentLen <= tailData.count {
+            let commentBytes = tailData.subdata(in: (eocdPos + 22)..<(eocdPos + 22 + commentLen))
+            archiveComment = LegacyCJKFilenameDecoder.decodePath(commentBytes, utf8FlagSet: false).path
+        }
+
+        // Check for ZIP64 End of Central Directory Locator (0x07064B50) directly before EOCD
+        if eocdPos >= 20 {
+            let locatorPos = eocdPos - 20
+            if readUInt32LE(tailData, at: locatorPos) == 0x0706_4B50 {
+                let zip64EOCDOffset = readUInt64LE(tailData, at: locatorPos + 8)
+                if zip64EOCDOffset + 56 <= fileSize {
+                    try handle.seek(toOffset: zip64EOCDOffset)
+                    let zip64HeaderData = handle.readData(ofLength: 56)
+                    if zip64HeaderData.count >= 56, readUInt32LE(zip64HeaderData, at: 0) == 0x0606_4B50 {
+                        totalEntries = readUInt64LE(zip64HeaderData, at: 32)
+                        cdSize = readUInt64LE(zip64HeaderData, at: 40)
+                        cdOffset = readUInt64LE(zip64HeaderData, at: 48)
+                    }
+                }
+            }
+        }
+
+        guard cdOffset + cdSize <= fileSize else {
+            throw ArchiveEngineError.invalidArchive("Invalid Central Directory offset/size")
+        }
+
+        try handle.seek(toOffset: cdOffset)
+        let cdData = handle.readData(ofLength: Int(cdSize))
+        guard cdData.count == Int(cdSize) else {
+            throw ArchiveEngineError.invalidArchive("Truncated Central Directory data")
+        }
+
+        let records = try parseCentralDirectoryRecords(from: cdData, totalEntries: Int(totalEntries))
+        return ParsedCentralDirectory(records: records, comment: archiveComment)
     }
 
     internal static func parseCentralDirectory(from data: Data) throws -> ParsedCentralDirectory {
@@ -280,7 +348,6 @@ public struct ZIPEngine: ArchiveEngine {
             throw ArchiveEngineError.invalidArchive("File smaller than minimum ZIP EOCD (22 bytes)")
         }
 
-        // Search backwards for End of Central Directory signature 0x06054B50
         let maxSearch = min(data.count, 22 + 65535)
         let searchFloor = data.count - maxSearch
         var eocdOffset: Int?
@@ -297,12 +364,26 @@ public struct ZIPEngine: ArchiveEngine {
             throw ArchiveEngineError.invalidArchive("Missing End of Central Directory record (0x06054B50)")
         }
 
-        let totalEntries = Int(readUInt16LE(data, at: eocd + 10))
-        let cdSize = Int(readUInt32LE(data, at: eocd + 12))
-        let cdOffset = Int(readUInt32LE(data, at: eocd + 16))
+        var totalEntries = UInt64(readUInt16LE(data, at: eocd + 10))
+        var cdSize = UInt64(readUInt32LE(data, at: eocd + 12))
+        var cdOffset = UInt64(readUInt32LE(data, at: eocd + 16))
         let commentLen = Int(readUInt16LE(data, at: eocd + 20))
 
-        guard cdOffset >= 0, cdOffset + cdSize <= eocd else {
+        if eocd >= 20 {
+            let locatorPos = eocd - 20
+            if readUInt32LE(data, at: locatorPos) == 0x0706_4B50 {
+                let zip64EOCDOffset = Int(readUInt64LE(data, at: locatorPos + 8))
+                if zip64EOCDOffset >= 0, zip64EOCDOffset + 56 <= data.count {
+                    if readUInt32LE(data, at: zip64EOCDOffset) == 0x0606_4B50 {
+                        totalEntries = readUInt64LE(data, at: zip64EOCDOffset + 32)
+                        cdSize = readUInt64LE(data, at: zip64EOCDOffset + 40)
+                        cdOffset = readUInt64LE(data, at: zip64EOCDOffset + 48)
+                    }
+                }
+            }
+        }
+
+        guard cdOffset + cdSize <= UInt64(data.count) else {
             throw ArchiveEngineError.invalidArchive("Invalid Central Directory offset/size")
         }
 
@@ -312,40 +393,46 @@ public struct ZIPEngine: ArchiveEngine {
             archiveComment = LegacyCJKFilenameDecoder.decodePath(commentBytes, utf8FlagSet: false).path
         }
 
+        let cdData = data.subdata(in: Int(cdOffset)..<Int(cdOffset + cdSize))
+        let records = try parseCentralDirectoryRecords(from: cdData, totalEntries: Int(totalEntries))
+        return ParsedCentralDirectory(records: records, comment: archiveComment)
+    }
+
+    internal static func parseCentralDirectoryRecords(from cdData: Data, totalEntries: Int) throws -> [CentralDirectoryRecord] {
         var records: [CentralDirectoryRecord] = []
-        records.reserveCapacity(totalEntries)
-        var cursor = cdOffset
+        records.reserveCapacity(min(totalEntries, 65536))
+        var cursor = 0
 
         for _ in 0..<totalEntries {
-            guard cursor + 46 <= eocd else { break }
-            let sig = readUInt32LE(data, at: cursor)
+            guard cursor + 46 <= cdData.count else { break }
+            let sig = readUInt32LE(cdData, at: cursor)
             guard sig == 0x0201_4B50 else {
-                throw ArchiveEngineError.invalidArchive("Invalid Central Directory header signature at \(cursor)")
+                break
             }
 
-            let versionMadeBy = readUInt16LE(data, at: cursor + 4)
-            let flags = readUInt16LE(data, at: cursor + 8)
-            let method = readUInt16LE(data, at: cursor + 10)
-            let dosTime = readUInt16LE(data, at: cursor + 12)
-            let dosDate = readUInt16LE(data, at: cursor + 14)
-            let crc = readUInt32LE(data, at: cursor + 16)
-            var compSize = Int64(readUInt32LE(data, at: cursor + 20))
-            var uncompSize = Int64(readUInt32LE(data, at: cursor + 24))
-            let nameLen = Int(readUInt16LE(data, at: cursor + 28))
-            let extraLen = Int(readUInt16LE(data, at: cursor + 30))
-            let fileCommentLen = Int(readUInt16LE(data, at: cursor + 32))
-            let extAttrs = readUInt32LE(data, at: cursor + 38)
-            var localOffset = Int64(readUInt32LE(data, at: cursor + 42))
+            let versionMadeBy = readUInt16LE(cdData, at: cursor + 4)
+            let flags = readUInt16LE(cdData, at: cursor + 8)
+            let method = readUInt16LE(cdData, at: cursor + 10)
+            let dosTime = readUInt16LE(cdData, at: cursor + 12)
+            let dosDate = readUInt16LE(cdData, at: cursor + 14)
+            let crc = readUInt32LE(cdData, at: cursor + 16)
+            var compSize = Int64(readUInt32LE(cdData, at: cursor + 20))
+            var uncompSize = Int64(readUInt32LE(cdData, at: cursor + 24))
+            let nameLen = Int(readUInt16LE(cdData, at: cursor + 28))
+            let extraLen = Int(readUInt16LE(cdData, at: cursor + 30))
+            let fileCommentLen = Int(readUInt16LE(cdData, at: cursor + 32))
+            let extAttrs = readUInt32LE(cdData, at: cursor + 38)
+            var localOffset = Int64(readUInt32LE(cdData, at: cursor + 42))
 
             let nameStart = cursor + 46
             let extraStart = nameStart + nameLen
             let nextCursor = extraStart + extraLen + fileCommentLen
-            guard nextCursor <= eocd else {
+            guard nextCursor <= cdData.count else {
                 throw ArchiveEngineError.invalidArchive("Truncated Central Directory entry at \(cursor)")
             }
 
-            let rawNameData = data.subdata(in: nameStart..<extraStart)
-            let extraData = data.subdata(in: extraStart..<(extraStart + extraLen))
+            let rawNameData = cdData.subdata(in: nameStart..<extraStart)
+            let extraData = cdData.subdata(in: extraStart..<(extraStart + extraLen))
 
             // Parse extra fields: 0x0001 (ZIP64) and 0x7075 (Info-ZIP Unicode Path)
             var unicodeOverridePath: String?
@@ -358,7 +445,6 @@ public struct ZIPEngine: ArchiveEngine {
                 guard fieldEnd <= extraData.count else { break }
 
                 if headerID == 0x7075 && dataSize >= 5 {
-                    // Info-ZIP Unicode Path Extra Field: version (1 byte) + nameCRC32 (4 bytes) + utf8Name
                     let nameCRC = readUInt32LE(extraData, at: fieldStart + 1)
                     if SmartCompressionClassifier.crc32Checksum(for: rawNameData) == nameCRC {
                         let utf8Data = extraData.subdata(in: (fieldStart + 5)..<fieldEnd)
@@ -419,7 +505,54 @@ public struct ZIPEngine: ArchiveEngine {
             cursor = nextCursor
         }
 
-        return ParsedCentralDirectory(records: records, comment: archiveComment)
+        return records
+    }
+
+    internal static func extractRecordPayload(_ rec: CentralDirectoryRecord, from handle: FileHandle) throws -> Data {
+        let localOffset = UInt64(rec.localHeaderOffset)
+        try handle.seek(toOffset: localOffset)
+        let headerData = handle.readData(ofLength: 30)
+        guard headerData.count == 30 else {
+            throw ArchiveEngineError.invalidArchive("Truncated local file header for \(rec.entry.path)")
+        }
+        let sig = readUInt32LE(headerData, at: 0)
+        guard sig == 0x0403_4B50 else {
+            throw ArchiveEngineError.invalidArchive("Invalid Local File Header signature for \(rec.entry.path)")
+        }
+
+        let nameLen = Int(readUInt16LE(headerData, at: 26))
+        let extraLen = Int(readUInt16LE(headerData, at: 28))
+        let payloadOffset = localOffset + 30 + UInt64(nameLen) + UInt64(extraLen)
+        try handle.seek(toOffset: payloadOffset)
+
+        guard rec.compressedSize >= 0 else {
+            throw ArchiveEngineError.invalidArchive("Invalid negative compressed size for \(rec.entry.path)")
+        }
+        let rawPayload = handle.readData(ofLength: Int(rec.compressedSize))
+        guard rawPayload.count == Int(rec.compressedSize) else {
+            throw ArchiveEngineError.invalidArchive("Truncated compressed payload for \(rec.entry.path)")
+        }
+
+        let uncompressed: Data
+        switch rec.compressionMethod {
+        case 0: // STORE
+            uncompressed = rawPayload
+        case 8: // DEFLATE
+            uncompressed = try SmartCompressionClassifier.rawInflate(
+                rawPayload,
+                expectedUncompressedSize: Int(max(0, rec.uncompressedSize))
+            )
+        default:
+            throw ArchiveEngineError.invalidArchive("Unsupported ZIP compression method \(rec.compressionMethod)")
+        }
+
+        let actualCRC = SmartCompressionClassifier.crc32Checksum(for: uncompressed)
+        if actualCRC != rec.crc32 {
+            throw ArchiveEngineError.invalidArchive(
+                String(format: "CRC32 mismatch for %@ (expected 0x%08X, got 0x%08X)", rec.entry.path, rec.crc32, actualCRC)
+            )
+        }
+        return uncompressed
     }
 
     internal static func extractRecordPayload(_ rec: CentralDirectoryRecord, from archiveData: Data) throws -> Data {
@@ -590,16 +723,22 @@ public enum NativeStreamingZIPWriter {
                 uncompressedLen = UInt32(rawData.count)
                 crc = SmartCompressionClassifier.crc32Checksum(for: rawData)
 
-                let decision = SmartCompressionClassifier.classify(fileAt: item.url, compressionLevel: profile.level)
-                if decision.intent == .compress,
-                   let deflated = SmartCompressionClassifier.rawDeflate(rawData, level: zlibLevel),
-                   deflated.count < rawData.count {
-                    method = 8 // DEFLATE
-                    payload = deflated
-                } else {
-                    // Direct STORE or No-Inflation Fallback (`noInflationFallbackFiles`)
-                    method = 0 // STORE
+                if profile.level == 0 {
+                    // Level 0: Direct STORE without attempting deflation (fast sequential packaging)
+                    method = 0
                     payload = rawData
+                } else {
+                    let decision = SmartCompressionClassifier.classify(fileAt: item.url, compressionLevel: profile.level)
+                    if decision.intent == .compress,
+                       let deflated = SmartCompressionClassifier.rawDeflate(rawData, level: zlibLevel),
+                       deflated.count < rawData.count {
+                        method = 8 // DEFLATE
+                        payload = deflated
+                    } else {
+                        // Direct STORE or No-Inflation Fallback (`noInflationFallbackFiles`)
+                        method = 0 // STORE
+                        payload = rawData
+                    }
                 }
                 completedBytes += Int64(rawData.count)
             }

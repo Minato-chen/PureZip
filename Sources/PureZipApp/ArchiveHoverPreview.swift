@@ -196,12 +196,13 @@ public final class PreviewArtifactCache {
             if let existingTask = inFlightExtractions[key] {
                 return existingTask
             }
-            let newTask = Task<URL, Error> {
+            let newTask = Task<URL, Error>(priority: .userInitiated) {
                 let lease = try ManagedWorkFileStore.shared.makeStagingLease(prefix: "shared-preview")
                 defer { lease.release() }
                 try await broker.extract(archiveURL, entries: [entry], to: lease.url)
 
                 var extractedURL = lease.url.appendingPathComponent(entry.path)
+                let nameNFC = entry.name.precomposedStringWithCanonicalMapping
                 if !FileManager.default.fileExists(atPath: extractedURL.path) {
                     let stripped = entry.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
                     let alt = lease.url.appendingPathComponent(stripped)
@@ -209,7 +210,23 @@ public final class PreviewArtifactCache {
                         extractedURL = alt
                     } else if let enumerator = FileManager.default.enumerator(at: lease.url, includingPropertiesForKeys: nil) {
                         while let item = enumerator.nextObject() {
-                            if let obj = item as? URL, obj.lastPathComponent == entry.name {
+                            if let obj = item as? URL, obj.lastPathComponent.precomposedStringWithCanonicalMapping == nameNFC {
+                                extractedURL = obj
+                                break
+                            }
+                        }
+                    }
+                }
+
+                // If primary extraction engine did not produce the file and it is a ZIP archive,
+                // fall back to native ZIPEngine direct central directory seeking
+                if !FileManager.default.fileExists(atPath: extractedURL.path) && archiveURL.pathExtension.lowercased() == "zip" {
+                    try? await ZIPEngine().extract(archiveURL, entries: [entry], to: lease.url)
+                    if FileManager.default.fileExists(atPath: extractedURL.path) {
+                        // Successfully extracted via ZIPEngine fallback
+                    } else if let enumerator = FileManager.default.enumerator(at: lease.url, includingPropertiesForKeys: nil) {
+                        while let item = enumerator.nextObject() {
+                            if let obj = item as? URL, obj.lastPathComponent.precomposedStringWithCanonicalMapping == nameNFC {
                                 extractedURL = obj
                                 break
                             }
@@ -224,6 +241,14 @@ public final class PreviewArtifactCache {
                 let ext = (entry.name as NSString).pathExtension.lowercased()
                 if let stored = self.storeExtractedFile(from: extractedURL, for: key, fileExtension: ext) {
                     return stored
+                }
+                // If storeExtractedFile could not persist to shared media cache, make an isolated safe copy
+                // before the staging lease directory is deleted by defer { lease.release() }
+                let safeTempDir = FileManager.default.temporaryDirectory.appendingPathComponent("PureZipPreviewIsolated", isDirectory: true)
+                try? FileManager.default.createDirectory(at: safeTempDir, withIntermediateDirectories: true)
+                let safeTempFile = safeTempDir.appendingPathComponent("\(UUID().uuidString).\(ext.isEmpty ? "bin" : ext)")
+                if (try? FileManager.default.copyItem(at: extractedURL, to: safeTempFile)) != nil {
+                    return safeTempFile
                 }
                 return extractedURL
             }
@@ -383,12 +408,20 @@ public final class HoverPreviewCoordinator: ObservableObject {
     private weak var currentSession: ArchiveBrowsingSession?
 
     private var eventMonitor: Any?
+    private var lastKeyboardEventMousePos: NSPoint = .zero
+    private var lastKeyboardEventTime: Date = .distantPast
+
+    public func recordKeyAction() {
+        lastKeyboardEventMousePos = NSEvent.mouseLocation
+        lastKeyboardEventTime = Date()
+        hideAll()
+    }
 
     private init() {
-        // Dismiss preview immediately when right click or middle click happens
-        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown, .otherMouseDown]) { [weak self] event in
+        // Dismiss preview immediately when right click, middle click, or any key down happens
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown, .otherMouseDown, .keyDown]) { [weak self] event in
             Task { @MainActor in
-                self?.hideAll()
+                self?.recordKeyAction()
             }
             return event
         }
@@ -446,6 +479,18 @@ public final class HoverPreviewCoordinator: ObservableObject {
         }
 
         if isHovered {
+            let currentMousePos = NSEvent.mouseLocation
+            let dx = currentMousePos.x - lastKeyboardEventMousePos.x
+            let dy = currentMousePos.y - lastKeyboardEventMousePos.y
+            let dist = sqrt(dx * dx + dy * dy)
+            let timeSinceKey = Date().timeIntervalSince(lastKeyboardEventTime)
+
+            // If within 1.5 seconds of a keyboard action and mouse hasn't moved by at least 4 points,
+            // this is an artifact of list scrolling under a stationary mouse cursor. Suppress preview!
+            if timeSinceKey < 1.5 && dist < 4.0 {
+                return
+            }
+
             dismissTask?.cancel()
             currentHoveredID = entry.id
             hoverTask?.cancel()
@@ -555,7 +600,8 @@ public final class HoverPreviewViewModel: ObservableObject {
         let ext = (entry.name as NSString).pathExtension.lowercased()
         let isMedia = MediaPreviewExtractor.isVideo(ext: ext) || MediaPreviewExtractor.isAudio(ext: ext)
         let isNested = entry.isNestedArchive
-        let maxLimit: Int64 = isMedia ? (2 * 1024 * 1024 * 1024) : (isNested ? (500 * 1024 * 1024) : (50 * 1024 * 1024))
+        let isImage = ImagePreviewHelper.isSupportedImage(ext: ext)
+        let maxLimit: Int64 = isMedia ? (2 * 1024 * 1024 * 1024) : (isNested ? (500 * 1024 * 1024) : (isImage ? (200 * 1024 * 1024) : (50 * 1024 * 1024)))
         guard entry.uncompressedSize <= maxLimit else {
             isLoading = false
             return
@@ -614,9 +660,9 @@ public final class HoverPreviewViewModel: ObservableObject {
                 self.audioData = aData
                 PreviewArtifactCache.shared.setAudioData(aData, for: cacheKey)
             }
-            // 1. Image Files
-            else if ["png", "jpg", "jpeg", "webp", "gif", "bmp", "heic", "tiff", "ico"].contains(ext) {
-                if let img = NSImage(contentsOf: fileURL) {
+            // 1. Image Files (Fast Downsampling Thumbnail Pipeline)
+            else if ImagePreviewHelper.isSupportedImage(ext: ext) {
+                if let img = ImagePreviewHelper.createThumbnail(at: fileURL, maxPixelSize: 1200) {
                     var dims = img.size
                     if let rep = img.representations.first {
                         dims = CGSize(width: rep.pixelsWide, height: rep.pixelsHigh)
@@ -643,19 +689,21 @@ public final class HoverPreviewViewModel: ObservableObject {
                     PreviewArtifactCache.shared.setPdfPages(pages, for: cacheKey)
                 }
             }
-            // 3. Office & Keynote documents (via native QLThumbnailGenerator)
+            // 3. Office & Keynote documents (via native QLThumbnailGenerator with resilient fallback)
             else if ["docx", "xlsx", "pptx", "pages", "numbers", "key"].contains(ext) {
+                let scale = NSScreen.main?.backingScaleFactor ?? 2.0
                 let req = QLThumbnailGenerator.Request(
                     fileAt: fileURL,
                     size: CGSize(width: 512, height: 512),
-                    scale: NSScreen.main?.backingScaleFactor ?? 2.0,
-                    representationTypes: .thumbnail
+                    scale: scale,
+                    representationTypes: .all
                 )
                 let (rep, _) = await withCheckedContinuation { continuation in
                     QLThumbnailGenerator.shared.generateBestRepresentation(for: req) { rep, err in
                         continuation.resume(returning: (rep, err))
                     }
                 }
+                guard !Task.isCancelled else { return }
                 if let qlImg = rep?.nsImage {
                     self.quickLookThumbnail = qlImg
                     PreviewArtifactCache.shared.setImage(qlImg, for: cacheKey)
@@ -678,7 +726,10 @@ public final class HoverPreviewViewModel: ObservableObject {
                     }
                 }
             }
-        } catch {}
+        } catch {
+            guard !Task.isCancelled else { return }
+        }
+        guard !Task.isCancelled else { return }
         isLoading = false
     }
 }
@@ -952,20 +1003,22 @@ public struct HoverPreviewCardView: View {
                     Image(nsImage: thumb)
                         .resizable()
                         .scaledToFit()
+                        .frame(maxWidth: 440, maxHeight: 400, alignment: .center)
                         .cornerRadius(6)
                         .shadow(color: Color.black.opacity(0.35), radius: 14, x: 0, y: 5)
                         .padding(8)
                 } else if model.isLoading {
                     loadingPlaceholder
                         .padding(14)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(.ultraThinMaterial))
+                        .frame(width: 240, height: 112, alignment: .center)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial))
                         .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 4)
                 } else {
                     fallbackCard
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .background(Color.clear)
     }
 
@@ -1059,22 +1112,65 @@ public struct HoverPreviewCardView: View {
     }
 
     private var fallbackCard: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "doc.fill")
+        VStack(spacing: 6) {
+            Image(systemName: fallbackIconName)
                 .font(.system(size: 26))
-                .foregroundStyle(Color(red: 0.05, green: 0.48, blue: 0.98))
+                .foregroundStyle(fallbackIconColor)
+
             Text(entry.name)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
+                .truncationMode(.middle)
+                .multilineTextAlignment(.center)
+
             Text(ByteCountFormatter.string(fromByteCount: entry.uncompressedSize, countStyle: .file))
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
+
+            Text("按空格键全功能预览")
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary.opacity(0.75))
+                .padding(.top, 1)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 10).fill(.ultraThinMaterial))
-        .shadow(color: Color.black.opacity(0.18), radius: 8, x: 0, y: 3)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(width: 240, height: 112, alignment: .center)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 0.8)
+        )
+        .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 4)
+    }
+
+    private var fallbackIconName: String {
+        switch ext {
+        case "xlsx", "xls", "csv", "tsv", "numbers":
+            return "tablecells.fill"
+        case "docx", "doc", "pages", "rtf":
+            return "doc.text.fill"
+        case "pptx", "ppt", "key":
+            return "doc.richtext.fill"
+        default:
+            return "doc.fill"
+        }
+    }
+
+    private var fallbackIconColor: Color {
+        switch ext {
+        case "xlsx", "xls", "csv", "tsv", "numbers":
+            return Color(red: 0.13, green: 0.65, blue: 0.35)
+        case "docx", "doc", "pages":
+            return Color(red: 0.05, green: 0.48, blue: 0.98)
+        case "pptx", "ppt", "key":
+            return Color(red: 0.95, green: 0.45, blue: 0.15)
+        default:
+            return Color(red: 0.05, green: 0.48, blue: 0.98)
+        }
     }
 
     private var loadingPlaceholder: some View {
